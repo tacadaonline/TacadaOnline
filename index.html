@@ -51,6 +51,23 @@ const somClique  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-select
 
 function tocar(s) { s.currentTime = 0; s.play().catch(()=>{}); }
 
+ function inicializarAudio() {
+    const sons = [somTacada, somColisao, somCaçapa, somErro, somClique];
+    sons.forEach(s => {
+        s.play().then(() => {
+            s.pause();
+            s.currentTime = 0;
+        }).catch(e => console.log("Aguardando interação para áudio"));
+    });
+    // Remove o evento após a primeira execução para não pesar
+    document.removeEventListener('click', inicializarAudio);
+    document.removeEventListener('touchstart', inicializarAudio);
+}
+
+// Escuta o primeiro clique ou toque na tela para liberar o som
+document.addEventListener('click', inicializarAudio);
+document.addEventListener('touchstart', inicializarAudio);
+ 
 /* ===== CONFIGURAÇÕES RTP STEALTH ===== */
 let dificuldadeRTP = 0.8; // 0.3 é indetectável. 0.9 é "azar" total.
 const multPagamento = 2.0;
