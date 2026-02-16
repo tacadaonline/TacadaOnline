@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sinuca Gold – Pro Series</title>
+<title>Sinuca Gold Pro – Final Version</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
   
-  .header { width: 100%; display: flex; justify-content: space-around; padding: 15px; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+  .header { width: 100%; padding: 15px; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
   .stat-value { color: #fff; font-weight: bold; font-size: 20px; display: block; }
   
@@ -17,12 +17,10 @@
   .bet-btn.active { color: #000; border-color: gold; background: gold; box-shadow: 0 0 15px rgba(255,215,0,0.3); }
   
   #confirm { margin-bottom: 15px; padding: 12px 40px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; }
-  #confirm:active { transform: scale(0.95); }
 
   canvas { 
     background: radial-gradient(circle, #1a7a3d 0%, #0b4d24 100%); 
-    border: 12px solid #3e2723; /* Borda de madeira */
-    border-radius: 8px; 
+    border: 12px solid #3e2723; border-radius: 8px; 
     box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.8);
   }
 
@@ -69,27 +67,24 @@ let timerIniciado = false;
 
 function ball(x, y, c) { return { x, y, vx: 0, vy: 0, r: 10, color: c }; }
 
-// Variáveis de posição
 let branca, dourada, hole;
 
 function sortearPosicoes() {
-    // 1. Sortear Caçapa nos cantos (0: SE, 1: SD, 2: IE, 3: ID)
-    const margin = 25;
+    const margin = 20; // Posição bem no canto
     const cantos = [
-        {x: margin, y: margin}, // Superior Esquerdo
-        {x: canvas.width - margin, y: margin}, // Superior Direito
-        {x: margin, y: canvas.height - margin}, // Inferior Esquerdo
-        {x: canvas.width - margin, y: canvas.height - margin} // Inferior Direito
+        {x: margin, y: margin},
+        {x: canvas.width - margin, y: margin},
+        {x: margin, y: canvas.height - margin},
+        {x: canvas.width - margin, y: canvas.height - margin}
     ];
     const indexCanto = Math.floor(Math.random() * 4);
-    hole = { ...cantos[indexCanto], r: 22 };
+    // CAÇAPA REDUZIDA PARA 15 (Mais difícil)
+    hole = { ...cantos[indexCanto], r: 15 };
 
-    // 2. Posicionar Dourada perto do centro, mas tendendo ao lado oposto da caçapa
     const offsetX = (hole.x < canvas.width/2) ? canvas.width * 0.6 : canvas.width * 0.4;
     const offsetY = (hole.y < canvas.height/2) ? canvas.height * 0.6 : canvas.height * 0.4;
     dourada = ball(offsetX + (Math.random()*40-20), offsetY + (Math.random()*40-20), "#ffd700");
 
-    // 3. Posicionar Branca em um local para dificultar o ângulo
     const bX = (hole.x < canvas.width/2) ? canvas.width * 0.8 : canvas.width * 0.2;
     const bY = (hole.y < canvas.height/2) ? canvas.height * 0.8 : canvas.height * 0.2;
     branca = ball(bX, bY, "#fff");
@@ -113,7 +108,7 @@ function confirmBet() {
   saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
   state = "PLAYING";
   document.getElementById("confirm").style.opacity = "0.5";
-  show("MIRA E JOGA!", "gold");
+  show("BOA SORTE!", "gold");
 }
 
 let startPos = { x: 0, y: 0 }, power = 0, angle = 0, charging = false;
@@ -155,7 +150,7 @@ function update() {
 
   [branca, dourada].forEach(b => {
     b.x += b.vx; b.y += b.vy;
-    b.vx *= 0.988; b.vy *= 0.988; // Atrito profissional
+    b.vx *= 0.988; b.vy *= 0.988;
     if (Math.abs(b.vx) < 0.1) b.vx = 0;
     if (Math.abs(b.vy) < 0.1) b.vy = 0;
     if (b.x - b.r < 0 || b.x + b.r > canvas.width) b.vx *= -0.8;
@@ -172,6 +167,7 @@ function update() {
     branca.vx *= -0.3; branca.vy *= -0.3;
   }
 
+  // Detecção de caçapa mais precisa
   if (Math.hypot(dourada.x - hole.x, dourada.y - hole.y) < hole.r) finish(true);
   if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0) finish(false, "ERROU");
 }
@@ -179,28 +175,23 @@ function update() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  // Desenhar Caçapa (Buraco Negro com Sombra)
+  // Caçapa
   ctx.fillStyle = "#000";
-  ctx.shadowBlur = 10; ctx.shadowColor = "#000";
   ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
 
-  // Mira Pontilhada
+  // Mira
   if (charging && state === "PLAYING") {
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.setLineDash();
     ctx.moveTo(branca.x, branca.y);
     ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.5), branca.y + Math.sin(angle) * (power * 1.5));
     ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.stroke(); ctx.setLineDash([]);
   }
 
-  // Desenhar Bolas com Brilho
+  // Bolas
   [branca, dourada].forEach(b => {
     let grad = ctx.createRadialGradient(b.x-2, b.y-2, 1, b.x, b.y, b.r);
-    grad.addColorStop(0, "#fff");
-    grad.addColorStop(1, b.color);
+    grad.addColorStop(0, "#fff"); grad.addColorStop(1, b.color);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
   });
