@@ -25,7 +25,7 @@
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 1000.00</span></div>
   <div class="stat-box"><span class="stat-label">Retorno (2.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 20.00</span></div>
-  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
+  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
 <div id="bet-panel">
@@ -54,7 +54,7 @@ function tocar(s) { s.currentTime = 0; s.play().catch(()=>{}); }
 /* ===== CONFIGURAÇÕES RTP STEALTH ===== */
 let dificuldadeRTP = 0.5; // 0.3 é indetectável. 0.9 é "azar" total.
 const multPagamento = 2.0;
-const tempoJogo = 3.00;
+const tempoJogo = 2.50;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -169,7 +169,7 @@ function update() {
     if (state === "PLAYING" && timerIniciado) {
         time -= 1/60;
         tempoEl.innerText = Math.max(0, time).toFixed(2);
-        if (time <= 0) finish(false, "TIMEOUT");
+        if (time <= 0) finish(false, "ERROU");
     }
 
     [branca, dourada].forEach(b => {
