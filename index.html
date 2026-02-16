@@ -46,7 +46,7 @@
         </div>
         <div class="stat-box">
             <span class="stat-label">Tempo</span>
-            <span class="stat-value" id="timer-text" style="color: #ff4444;">07.00</span>
+            <span class="stat-value" id="timer-text" style="color: #ff4444;">03.00</span>
         </div>
     </div>
 
@@ -75,7 +75,7 @@
         // LÓGICA FINANCEIRA
         let saldo = 100.00;
         let valorAposta = 10;
-        let multiplicadorPremio = 5; // Ex: Aposta 10, ganha 50
+        let multiplicadorPremio = 5; // Ex: Aposta 10, ganha 10
         let totalDepositado = 100.00; 
         let totalGanho = 0;
 
@@ -124,7 +124,7 @@
             if(timerAtivo && !aguardandoParar) {
                 timeLeft -= 1/60;
                 timerText.innerText = Math.max(0, timeLeft).toFixed(2);
-                timerFill.style.width = (timeLeft / 7 * 100) + "%";
+                timerFill.style.width = (timeLeft / 3 * 100) + "%";
                 if(timeLeft <= 0) { timerAtivo = false; finalizarRodada(false, "TEMPO ESGOTADO!"); }
             }
 
@@ -182,7 +182,7 @@
             branca.x = canvas.width * 0.8; branca.y = canvas.height * 0.8;
             dourada.vx = 0; dourada.vy = 0;
             dourada.x = canvas.width / 2; dourada.y = canvas.height / 2;
-            timeLeft = 7.00;
+            timeLeft = 3.00;
             timerAtivo = true;
             aguardandoParar = false;
         }
