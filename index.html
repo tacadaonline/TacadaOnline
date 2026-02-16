@@ -3,19 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sinuca Gold Pro – Estável</title>
+<title>Sinuca Gold Pro – RTP Engine</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
+
   .header { width: 100%; padding: 15px; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; }
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
   .stat-value { color: #fff; font-weight: bold; font-size: 20px; display: block; }
+
   #bet-panel { margin: 15px; display: flex; gap: 8px; }
   .bet-btn { padding: 10px 16px; background: #222; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; }
   .bet-btn.active { color: #000; border-color: gold; background: gold; }
+
   #confirm { margin-bottom: 15px; padding: 12px 40px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-  canvas { background: radial-gradient(circle, #1a7a3d 0%, #0b4d24 100%); border: 12px solid #3e2723; border-radius: 8px; box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.8); }
-  #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; }
+
+  canvas {
+    background: radial-gradient(circle, #1a7a3d 0%, #0b4d24 100%);
+    border: 12px solid #3e2723; border-radius: 8px;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.8);
+  }
+
+  #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; pointer-events: none;}
 </style>
 </head>
 <body>
@@ -39,6 +48,9 @@
 <div id="msg"></div>
 
 <script>
+/* ===== CONFIGURAÇÕES DO MOTOR (RTP) ===== */
+let dificuldadeRTP = 0.3; // 0.0 Justo | 0.3 Padrão Casino | 1.0 Impossível
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
@@ -56,37 +68,33 @@ let state = "BETTING";
 let time = 3.00;
 let timerIniciado = false;
 
-// Objetos globais das bolas para evitar recriação
 let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 10, color: "#fff" };
 let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 10, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 15 };
+let hole = { x: 0, y: 0, r: 15 }; // Caçapa Profissional Reduzida
 
 function sortearPosicoes() {
     const m = 25; 
     const cantos = [
-        {x: m, y: m},
-        {x: canvas.width - m, y: m},
-        {x: m, y: canvas.height - m},
-        {x: canvas.width - m, y: canvas.height - m}
+        {x: m, y: m}, {x: canvas.width - m, y: m},
+        {x: m, y: canvas.height - m}, {x: canvas.width - m, y: canvas.height - m}
     ];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
 
-    // Lógica robusta de posicionamento
     if (hole.x < canvas.width/2) {
-        dourada.x = canvas.width * 0.6 + (Math.random()*20);
+        dourada.x = canvas.width * 0.55 + (Math.random()*20);
         branca.x = canvas.width * 0.8;
     } else {
-        dourada.x = canvas.width * 0.4 - (Math.random()*20);
+        dourada.x = canvas.width * 0.45 - (Math.random()*20);
         branca.x = canvas.width * 0.2;
     }
 
     if (hole.y < canvas.height/2) {
-        dourada.y = canvas.height * 0.6 + (Math.random()*20);
+        dourada.y = canvas.height * 0.55 + (Math.random()*20);
         branca.y = canvas.height * 0.8;
     } else {
-        dourada.y = canvas.height * 0.4 - (Math.random()*20);
+        dourada.y = canvas.height * 0.45 - (Math.random()*20);
         branca.y = canvas.height * 0.2;
     }
     
@@ -156,12 +164,18 @@ function update() {
         b.vx *= 0.988; b.vy *= 0.988;
         if (Math.abs(b.vx) < 0.1) b.vx = 0;
         if (Math.abs(b.vy) < 0.1) b.vy = 0;
-        // Colisão Bordas
         if (b.x - b.r < 0 || b.x + b.r > canvas.width) { b.vx *= -0.8; b.x = b.x < canvas.width/2 ? b.r : canvas.width - b.r; }
         if (b.y - b.r < 0 || b.y + b.r > canvas.height) { b.vy *= -0.8; b.y = b.y < canvas.height/2 ? b.r : canvas.height - b.r; }
     });
 
-    // Colisão entre bolas
+    /* LÓGICA DE DESVIO (TREVO/RTP) */
+    let distHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
+    if (distHole < 60 && dificuldadeRTP > 0) {
+        let anguloDesvio = Math.atan2(dourada.y - hole.y, dourada.x - hole.x);
+        dourada.vx += Math.cos(anguloDesvio) * (dificuldadeRTP * 0.15);
+        dourada.vy += Math.sin(anguloDesvio) * (dificuldadeRTP * 0.15);
+    }
+
     let dx = dourada.x - branca.x;
     let dy = dourada.y - branca.y;
     if (Math.hypot(dx, dy) < branca.r + dourada.r) {
@@ -172,30 +186,23 @@ function update() {
         branca.vx *= -0.3; branca.vy *= -0.3;
     }
 
-    // Fim de jogo
     if (Math.hypot(dourada.x - hole.x, dourada.y - hole.y) < hole.r) finish(true);
-    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 2.8) {
-        finish(false, "ERROU");
-    }
+    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 2.8) finish(false, "ERROU");
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Caçapa
     ctx.fillStyle = "#000";
     ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
 
-    // Mira
     if (charging && state === "PLAYING") {
-        ctx.beginPath(); ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.setLineDash([]);
         ctx.moveTo(branca.x, branca.y);
         ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.5), branca.y + Math.sin(angle) * (power * 1.5));
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+        ctx.stroke();
     }
 
-    // Bolas
     [branca, dourada].forEach(b => {
         let grad = ctx.createRadialGradient(b.x-3, b.y-3, 1, b.x, b.y, b.r);
         grad.addColorStop(0, "#fff"); grad.addColorStop(1, b.color);
