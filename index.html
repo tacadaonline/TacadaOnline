@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sinuca Gold Ultra – Hardcore Stealth</title>
+<title>TACADA ONLINE </title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
@@ -121,7 +121,7 @@ function resetSelection() {
 }
 
 function atualizarLucro() {
-    lucroEl.innerText = `R$ ${(valorAposta * multPagamento).toFixed(2)}`;
+    lucroEl.innerText = `R$ ${(valorAposta * 2).toFixed(2)}`;
 }
 
 function confirmBet() {
@@ -132,7 +132,7 @@ function confirmBet() {
     saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     state = "PLAYING";
     document.getElementById("confirm").style.opacity = "0.5";
-    show("MIRA!", "gold");
+    show("MIRA! BOA SORTE", "gold");
 }
 
 let startPos = { x: 0, y: 0 }, power = 0, angle = 0, charging = false;
@@ -228,15 +228,21 @@ function draw() {
 function finish(win, msg) {
     if (state !== "PLAYING") return;
     state = "RESULT";
+
     if (win) {
         tocar(somCaçapa);
-        let gain = lockedBet * multPagamento;
-        saldo += gain;
-        show(`GREEN R$ ${(lockedBet * 0.1).toFixed(2)}`, "gold");
-    } else { 
+
+        // retorno total = aposta + lucro
+        let retornoTotal = lockedBet * 2;
+
+        saldo += retornoTotal;
+
+        show(`GREEN +R$ ${lockedBet.toFixed(2)}`, "gold");
+    } else {
         tocar(somErro);
-        show(msg || "LOSS", "#ff4444"); 
+        show(msg || "LOSS", "#ff4444");
     }
+
     saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     setTimeout(reset, 1500);
 }
