@@ -184,8 +184,8 @@ function update() {
     if (distHole < 65 && dificuldadeRTP > 0) {
         let aD = Math.atan2(dourada.y - hole.y, dourada.x - hole.x);
         let desvioLateral = Math.PI / 2; 
-        dourada.vx += Math.cos(aD + desvioLateral) * (dificuldadeRTP * 0.08);
-        dourada.vy += Math.sin(aD + desvioLateral) * (dificuldadeRTP * 0.08);
+        dourada.vx += Math.cos(aD + desvioLateral) * (dificuldadeRTP * 0.02);
+        dourada.vy += Math.sin(aD + desvioLateral) * (dificuldadeRTP * 0.02);
         dourada.vx *= (1 - (dificuldadeRTP * 0.02)); 
         dourada.vy *= (1 - (dificuldadeRTP * 0.02));
     }
