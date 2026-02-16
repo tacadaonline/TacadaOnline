@@ -160,8 +160,8 @@ canvas.addEventListener("touchend", e => {
     tocar(somTacada);
     if(navigator.vibrate) navigator.vibrate(40);
     charging = false;
-    branca.vx = Math.cos(angle) * (power / 5.5);
-    branca.vy = Math.sin(angle) * (power / 5.5);
+    branca.vx = Math.cos(angle) * (power / 5.0);
+    branca.vy = Math.sin(angle) * (power / 5.0);
     power = 0;
 }, { passive: false });
 
