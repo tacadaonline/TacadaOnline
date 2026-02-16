@@ -85,32 +85,29 @@ function sortearPosicoes() {
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
 
-    // --- LÓGICA DE DISTÂNCIA MÁXIMA ---
-
-    // 1. Inverte a direção baseado na caçapa (se a caçapa é 0, a bola vai para o fim da largura)
+    // 1. Direção oposta à caçapa
     let dirX = (hole.x < canvas.width / 2) ? 1 : -1;
     let dirY = (hole.y < canvas.height / 2) ? 1 : -1;
 
-    // 2. Ângulo mais fechado (quase na diagonal oposta) com variação infinita
-    // Isso evita que as bolas fiquem "grudadas" na parede lateral
-    let anguloBase = (Math.PI / 4) + (Math.random() * 0.3 - 0.15); 
+    // 2. Ângulo diagonal (45 graus com variação mínima para ser "infinito")
+    let anguloBase = (Math.PI / 4) + (Math.random() * 0.2 - 0.1);
 
-    // 3. Distâncias LONGAS (conforme seu desenho)
-    // A amarela fica entre 75% e 85% de distância da caçapa
-    let distDourada = canvas.width * (0.75 + Math.random() * 0.10);
+    // 3. DISTÂNCIA EXTREMA (Aqui está o segredo)
+    // A amarela fica a 88% da distância total da mesa
+    let distDourada = canvas.width * (0.85 + Math.random() * 0.05);
 
-    // A branca fica logo atrás com um gap curto (35 a 55 pixels)
-    let gapBolas = 35 + (Math.random() * 20);
+    // A branca fica logo atrás (gap de apenas 30 pixels para ficarem grudadas)
+    let gapBolas = 30 + (Math.random() * 10);
     let distBranca = distDourada + gapBolas;
 
-    // 4. Cálculo das posições X e Y
+    // 4. Cálculo das posições
     dourada.x = hole.x + (Math.cos(anguloBase) * distDourada * dirX);
     dourada.y = hole.y + (Math.sin(anguloBase) * distDourada * dirY);
 
     branca.x = hole.x + (Math.cos(anguloBase) * distBranca * dirX);
     branca.y = hole.y + (Math.sin(anguloBase) * distBranca * dirY);
 
-    // Reset total de velocidade para não bugar o início
+    // Reset de velocidades
     branca.vx = 0; branca.vy = 0; 
     dourada.vx = 0; dourada.vy = 0;
 }
@@ -184,8 +181,8 @@ canvas.addEventListener("touchend", e => {
     tocar(somTacada);
     if(navigator.vibrate) navigator.vibrate(40);
     charging = false;
-    branca.vx = Math.cos(angle) * (power / 5.5);
-    branca.vy = Math.sin(angle) * (power / 5.5);
+    branca.vx = Math.cos(angle) * (power / 4.5);
+    branca.vy = Math.sin(angle) * (power / 4.5);
     power = 0;
 }, { passive: false });
 
