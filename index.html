@@ -3,46 +3,73 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sinuca Gold</title>
+<title>Sinuca Gold – Casino</title>
 
 <style>
 body{
-    margin:0;
-    background:#0a0a0a;
-    color:gold;
-    font-family:Arial, sans-serif;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    overflow:hidden;
+  margin:0;
+  background:#0a0a0a;
+  color:gold;
+  font-family:Arial,sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
 }
 
 .header{
-    width:100%;
-    padding:10px;
-    display:flex;
-    justify-content:space-around;
-    background:#111;
-    border-bottom:2px solid #222;
+  width:100%;
+  display:flex;
+  justify-content:space-around;
+  padding:10px;
+  background:#111;
+  border-bottom:2px solid #222;
 }
 
-.stat-box{text-align:center}
-.stat-value{font-weight:bold;color:#fff}
+.stat-value{color:#fff;font-weight:bold}
+
+#bet-panel{
+  margin:10px;
+  display:flex;
+  gap:8px;
+}
+
+.bet-btn{
+  padding:8px 14px;
+  background:#222;
+  border:1px solid #444;
+  color:#aaa;
+  border-radius:5px;
+}
+
+.bet-btn.active{
+  color:gold;
+  border-color:gold;
+  background:#332b00;
+}
+
+#confirm{
+  margin-bottom:10px;
+  padding:10px 30px;
+  background:gold;
+  color:#000;
+  border:none;
+  border-radius:6px;
+  font-weight:bold;
+}
 
 canvas{
-    margin-top:10px;
-    background:radial-gradient(circle,#0b5e28 0%,#053a18 100%);
-    border:6px solid #3e2723;
-    border-radius:12px;
+  background:radial-gradient(circle,#0b5e28 0%,#053a18 100%);
+  border:6px solid #3e2723;
+  border-radius:12px;
 }
 
 #msg{
-    position:absolute;
-    top:50%;
-    transform:translateY(-50%);
-    font-size:28px;
-    font-weight:bold;
-    display:none;
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:28px;
+  display:none;
+  font-weight:bold;
 }
 </style>
 </head>
@@ -50,215 +77,181 @@ canvas{
 <body>
 
 <div class="header">
-<div class="stat-box">SALDO<br><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-<div class="stat-box">RETORNO (2x)<br><span id="retorno" class="stat-value" style="color:#0f0">R$ 20.00</span></div>
-<div class="stat-box">TEMPO<br><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
+  <div>SALDO<br><span id="saldo" class="stat-value">R$ 1000.00</span></div>
+  <div>APOSTA<br><span id="bet" class="stat-value">R$ 10.00</span></div>
+  <div>TEMPO<br><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
 </div>
+
+<div id="bet-panel">
+  <button class="bet-btn active" onclick="selectBet(10,this)">R$10</button>
+  <button class="bet-btn" onclick="selectBet(20,this)">R$20</button>
+  <button class="bet-btn" onclick="selectBet(50,this)">R$50</button>
+  <button class="bet-btn" onclick="selectBet(100,this)">R$100</button>
+</div>
+
+<button id="confirm" onclick="confirmBet()">CONFIRMAR APOSTA</button>
 
 <canvas id="game"></canvas>
 <div id="msg"></div>
 
 <script>
+/* ===== SETUP ===== */
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth*0.94;
+canvas.height=canvas.width*0.8;
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const saldoEl=document.getElementById("saldo");
+const betEl=document.getElementById("bet");
+const tempoEl=document.getElementById("tempo");
+const msgEl=document.getElementById("msg");
 
-canvas.width = window.innerWidth * 0.94;
-canvas.height = canvas.width * 0.8;
+let saldo=1000;
+let betValue=10;
+let lockedBet=0;
+let state="BETTING"; // BETTING | PLAYING | RESULT
+let time=3;
 
-const saldoEl = document.getElementById("saldo");
-const retornoEl = document.getElementById("retorno");
-const tempoEl = document.getElementById("tempo");
-const msgEl = document.getElementById("msg");
+/* ===== BALLS ===== */
+function ball(x,y,c){
+  return {x,y,vx:0,vy:0,r:9,color:c};
+}
+let branca=ball(canvas.width*0.85,canvas.height*0.8,"#fff");
+let dourada=ball(canvas.width/2,canvas.height/2,"#ffd700");
+const hole={x:30,y:30,r:18};
 
-let saldo = 1000;
-let aposta = 10;
-let multiplicador = 2;
-
-let estado = "pronto"; // pronto | jogando | resultado
-let tempo = 3;
-
-let charging=false;
-let power=0;
-let angle=0;
-let dragStart={x:0,y:0};
-
-const friccao=0.99;
-const minVel=0.05;
-
-function bola(x,y,color){
-    return {x,y,vx:0,vy:0,r:9,color};
+/* ===== BET ===== */
+function selectBet(v,btn){
+  if(state!=="BETTING")return;
+  betValue=v;
+  betEl.innerText=`R$ ${v.toFixed(2)}`;
+  document.querySelectorAll(".bet-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
 }
 
-let branca = bola(canvas.width*0.85, canvas.height*0.8, "#fff");
-let dourada = bola(canvas.width/2, canvas.height/2, "#ffd700");
-const cacapa = {x:30,y:30,r:18};
-
-retornoEl.innerText="R$ "+(aposta*multiplicador).toFixed(2);
-
-/* ================= FÍSICA ================= */
-
-function atualizarBola(b){
-    b.x+=b.vx;
-    b.y+=b.vy;
-    b.vx*=friccao;
-    b.vy*=friccao;
-
-    if(Math.abs(b.vx)<minVel) b.vx=0;
-    if(Math.abs(b.vy)<minVel) b.vy=0;
-
-    if(b.x-b.r<0 || b.x+b.r>canvas.width) b.vx*=-0.8;
-    if(b.y-b.r<0 || b.y+b.r>canvas.height) b.vy*=-0.8;
+function confirmBet(){
+  if(state!=="BETTING")return;
+  if(saldo<betValue){alert("Saldo insuficiente");return;}
+  lockedBet=betValue;
+  saldo-=lockedBet;
+  saldoEl.innerText=`R$ ${saldo.toFixed(2)}`;
+  state="PLAYING";
 }
 
-function colisao(b1,b2){
-    let dx=b2.x-b1.x;
-    let dy=b2.y-b1.y;
-    let dist=Math.hypot(dx,dy);
-
-    if(dist<b1.r+b2.r){
-        let ang=Math.atan2(dy,dx);
-        let vel=Math.hypot(b1.vx,b1.vy);
-
-        b2.vx=Math.cos(ang)*vel;
-        b2.vy=Math.sin(ang)*vel;
-
-        b1.vx*=-0.3;
-        b1.vy*=-0.3;
-    }
+/* ===== PHYSICS ===== */
+function move(b){
+  b.x+=b.vx;
+  b.y+=b.vy;
+  b.vx*=0.99;
+  b.vy*=0.99;
+  if(Math.abs(b.vx)<0.05)b.vx=0;
+  if(Math.abs(b.vy)<0.05)b.vy=0;
+  if(b.x-b.r<0||b.x+b.r>canvas.width)b.vx*=-0.8;
+  if(b.y-b.r<0||b.y+b.r>canvas.height)b.vy*=-0.8;
 }
 
-/* ================= GAME ================= */
+function collide(){
+  let dx=dourada.x-branca.x;
+  let dy=dourada.y-branca.y;
+  let d=Math.hypot(dx,dy);
+  if(d<branca.r+dourada.r){
+    let a=Math.atan2(dy,dx);
+    let v=Math.hypot(branca.vx,branca.vy);
+    dourada.vx=Math.cos(a)*v;
+    dourada.vy=Math.sin(a)*v;
+    branca.vx*=-0.3;
+    branca.vy*=-0.3;
+  }
+}
 
+/* ===== GAME ===== */
 function update(){
+  if(state==="PLAYING"){
+    time-=1/60;
+    tempoEl.innerText=time.toFixed(2);
+    if(time<=0)finish(false,"TEMPO ESGOTADO");
+  }
 
-    if(estado==="jogando"){
-        tempo-=1/60;
-        tempoEl.innerText=tempo.toFixed(2);
-        if(tempo<=0) fim(false,"TEMPO ESGOTADO");
-    }
+  move(branca); move(dourada); collide();
 
-    atualizarBola(branca);
-    atualizarBola(dourada);
-    colisao(branca,dourada);
+  if(Math.hypot(dourada.x-hole.x,dourada.y-hole.y)<hole.r){
+    finish(true);
+  }
 
-    if(Math.hypot(dourada.x-cacapa.x,dourada.y-cacapa.y)<cacapa.r){
-        fim(true);
-    }
-
-    if(estado==="jogando" &&
-       branca.vx===0 && branca.vy===0 &&
-       dourada.vx===0 && dourada.vy===0){
-        fim(false,"ERROU");
-    }
+  if(state==="PLAYING"&&branca.vx===0&&dourada.vx===0){
+    finish(false,"ERROU");
+  }
 }
 
 function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    ctx.fillStyle="#000";
-    ctx.beginPath();
-    ctx.arc(cacapa.x,cacapa.y,cacapa.r,0,Math.PI*2);
-    ctx.fill();
-
-    if(charging){
-        ctx.beginPath();
-        ctx.moveTo(branca.x,branca.y);
-        ctx.lineTo(
-            branca.x+Math.cos(angle)*power,
-            branca.y+Math.sin(angle)*power
-        );
-        ctx.strokeStyle="rgba(255,255,255,0.3)";
-        ctx.stroke();
-    }
-
-    [branca,dourada].forEach(b=>{
-        ctx.fillStyle=b.color;
-        ctx.beginPath();
-        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-        ctx.fill();
-    });
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#000";
+  ctx.beginPath();ctx.arc(hole.x,hole.y,hole.r,0,Math.PI*2);ctx.fill();
+  [branca,dourada].forEach(b=>{
+    ctx.fillStyle=b.color;
+    ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+  });
 }
 
-function fim(vitoria,msg){
-    if(estado!=="jogando") return;
-    estado="resultado";
-
-    if(vitoria){
-        let ganho=aposta*multiplicador;
-        saldo+=ganho;
-        mostrar("GANHOU R$ "+ganho.toFixed(2),"gold");
-    }else{
-        mostrar(msg||"PERDEU","#ff4444");
-    }
-
-    saldoEl.innerText="R$ "+saldo.toFixed(2);
-
-    setTimeout(reset,1500);
-}
-
-function mostrar(t,c){
-    msgEl.innerText=t;
-    msgEl.style.color=c;
-    msgEl.style.display="block";
-    setTimeout(()=>msgEl.style.display="none",1500);
+function finish(win,msg){
+  if(state!=="PLAYING")return;
+  state="RESULT";
+  if(win){
+    let gain=lockedBet*2;
+    saldo+=gain;
+    show(`GANHOU R$ ${gain.toFixed(2)}`,"gold");
+  }else{
+    show(msg||"PERDEU","#ff4444");
+  }
+  saldoEl.innerText=`R$ ${saldo.toFixed(2)}`;
+  setTimeout(reset,1500);
 }
 
 function reset(){
-    branca = bola(canvas.width*0.85, canvas.height*0.8, "#fff");
-    dourada = bola(canvas.width/2, canvas.height/2, "#ffd700");
-    tempo=3;
-    tempoEl.innerText="3.00";
-    estado="pronto";
+  branca=ball(canvas.width*0.85,canvas.height*0.8,"#fff");
+  dourada=ball(canvas.width/2,canvas.height/2,"#ffd700");
+  time=3;
+  tempoEl.innerText="3.00";
+  lockedBet=0;
+  state="BETTING";
 }
 
-/* ================= TOUCH ================= */
+function show(t,c){
+  msgEl.innerText=t;
+  msgEl.style.color=c;
+  msgEl.style.display="block";
+  setTimeout(()=>msgEl.style.display="none",1500);
+}
+
+/* ===== TOUCH ===== */
+let start={x:0,y:0},power=0,angle=0,charging=false;
 
 canvas.addEventListener("touchstart",e=>{
-    if(estado!=="pronto") return;
-    if(saldo<aposta) return;
-
-    const t=e.touches[0];
-    charging=true;
-    dragStart={x:t.clientX,y:t.clientY};
+  if(state!=="PLAYING")return;
+  charging=true;
+  start={x:e.touches[0].clientX,y:e.touches[0].clientY};
 });
 
 canvas.addEventListener("touchmove",e=>{
-    if(!charging) return;
-
-    const t=e.touches[0];
-    let dx=dragStart.x-t.clientX;
-    let dy=dragStart.y-t.clientY;
-
-    angle=Math.atan2(dy,dx);
-    power=Math.min(Math.hypot(dx,dy)/2,100);
+  if(!charging)return;
+  let dx=start.x-e.touches[0].clientX;
+  let dy=start.y-e.touches[0].clientY;
+  angle=Math.atan2(dy,dx);
+  power=Math.min(Math.hypot(dx,dy)/2,100);
 });
 
 canvas.addEventListener("touchend",()=>{
-    if(!charging) return;
-    charging=false;
-
-    if(power>5){
-        saldo-=aposta;
-        saldoEl.innerText="R$ "+saldo.toFixed(2);
-
-        branca.vx=Math.cos(angle)*(power/6);
-        branca.vy=Math.sin(angle)*(power/6);
-
-        estado="jogando";
-    }
+  if(!charging)return;
+  charging=false;
+  branca.vx=Math.cos(angle)*(power/6);
+  branca.vy=Math.sin(angle)*(power/6);
 });
 
-/* ================= LOOP ================= */
-
+/* ===== LOOP ===== */
 function loop(){
-    update();
-    draw();
-    requestAnimationFrame(loop);
+  update(); draw(); requestAnimationFrame(loop);
 }
-
 loop();
-
 </script>
 </body>
 </html>
