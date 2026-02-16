@@ -3,205 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Pro - Premium Mobile</title>
+    <title>Sinuca Gold Mobile</title>
     <style>
-        :root {
-            --bg-color: #1a1a1a;
-            --table-color: #006400;
-            --border-color: #5d2e0a;
-            --text-color: #ffffff;
-            --accent-color: #f1c40f;
+        body { 
+            background: #0f0f0f; color: gold; font-family: 'Arial Black', sans-serif; 
+            margin: 0; overflow: hidden; display: flex; flex-direction: column; 
+            align-items: center; height: 100vh; touch-action: none;
+        }
+        .header { margin-top: 20px; text-align: center; z-index: 10; }
+        #saldo-container { font-size: 28px; text-shadow: 0 0 10px #ffcc00; }
+        
+        canvas { 
+            background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); 
+            border: 8px solid #3e2723; border-radius: 15px; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.8); margin-top: 20px;
         }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
-            touch-action: manipulation;
+        #force-bar-container {
+            width: 80%; height: 20px; background: #222; 
+            border: 2px solid gold; margin-top: 20px; border-radius: 10px; overflow: hidden;
         }
-
-        .header {
-            padding: 20px;
-            text-align: center;
+        #force-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0, #f00); }
+        
+        /* Mensagem de Vitória */
+        #win-msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 60px; color: #fff; text-shadow: 0 0 20px #ff0;
+            display: none; z-index: 100; pointer-events: none;
         }
-
-        .stats {
-            background: rgba(0,0,0,0.5);
-            padding: 10px 20px;
-            border-radius: 50px;
-            border: 1px solid var(--accent-color);
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-
-        #game-container {
-            position: relative;
-            width: 95vw;
-            max-width: 800px;
-            aspect-ratio: 2 / 1;
-            border: 8px solid var(--border-color);
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        canvas {
-            background: var(--table-color);
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .controls {
-            margin-top: 20px;
-            padding: 10px;
-            text-align: center;
-            max-width: 90%;
-        }
-
-        .msg {
-            font-weight: bold;
-            height: 24px;
-            margin-top: 10px;
-            color: var(--accent-color);
-        }
-
-        /* Animação de ganho */
-        .win-flash { color: #2ecc71; font-size: 1.5rem; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>Sinuca Apostada</h1>
-        <div class="stats">
-            Saldo: <span id="saldo" style="color: #2ecc71;">R$ 100.00</span>
-        </div>
-        <div id="mensagem" class="msg">Toque na mesa para jogar (R$ 10,00)</div>
+        <div id="saldo-container">R$ <span id="saldo">100.00</span></div>
     </div>
 
-    <div id="game-container">
-        <canvas id="poolTable" width="800" height="400"></canvas>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="force-bar-container">
+        <div id="force-fill"></div>
     </div>
 
-    <div class="controls">
-        <p>Probabilidade de Retenção: 90% (Modo Casa)</p>
-        <small>Simulação de sistema de apostas para fins de estudo.</small>
-    </div>
+    <div id="win-msg">GANHOU! 💰</div>
 
     <script>
-        const canvas = document.getElementById('poolTable');
+        const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const saldoElement = document.getElementById('saldo');
-        const msgElement = document.getElementById('mensagem');
+        const forceFill = document.getElementById('force-fill');
+        const winMsg = document.getElementById('win-msg');
+
+        // Ajuste de tamanho para celular
+        canvas.width = window.innerWidth * 0.9;
+        canvas.height = canvas.width * 0.6;
 
         let saldo = 100.00;
-        let taxaRetencao = 0.90; 
-        let jogando = false;
+        let power = 0;
+        let charging = false;
+        let particles = [];
+        const taxaRetencao = 0.90;
 
-        let bola = { x: 150, y: 200, vx: 0, vy: 0, radius: 12 };
-        let alvo = { x: 740, y: 200, radius: 25 };
+        let bola = { x: canvas.width * 0.2, y: canvas.height / 2, vx: 0, vy: 0, r: 12 };
+        let cacapa = { x: canvas.width * 0.85, y: canvas.height / 2, r: 22 };
+
+        function createParticles(x, y) {
+            for(let i=0; i<30; i++) {
+                particles.push({
+                    x, y, 
+                    vx: (Math.random()-0.5)*10, 
+                    vy: (Math.random()-0.5)*10, 
+                    life: 1.0
+                });
+            }
+        }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Caçapa (Buraco)
+            // Caçapa
             ctx.fillStyle = '#000';
-            ctx.beginPath();
-            ctx.arc(alvo.x, alvo.y, alvo.radius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Brilho da caçapa
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-            ctx.lineWidth = 3;
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
 
-            // Bola Branca
+            // Partículas
+            particles.forEach((p, i) => {
+                ctx.fillStyle = `rgba(255, 215, 0, ${p.life})`;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if(p.life <= 0) particles.splice(i, 1);
+            });
+
+            // Bola
             ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(bola.x, bola.y, bola.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.shadowBlur = 5; ctx.shadowColor = "#000";
+            ctx.beginPath(); ctx.arc(bola.x, bola.y, bola.r, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
 
-            // Movimento e Atrito
-            bola.x += bola.vx;
-            bola.y += bola.vy;
-            bola.vx *= 0.985;
-            bola.vy *= 0.985;
-
-            // Detectar parada para nova jogada
-            if (Math.abs(bola.vx) < 0.1 && Math.abs(bola.vy) < 0.1 && jogando) {
-                jogando = false;
-                resetPos();
-            }
-
-            // Detectar se entrou na caçapa (Lógica simplificada)
-            let dist = Math.hypot(bola.x - alvo.x, bola.y - alvo.y);
-            if (dist < alvo.radius && jogando) {
-                ganhar();
-            }
-
+            update();
             requestAnimationFrame(draw);
         }
 
-        function resetPos() {
-            bola.x = 150;
-            bola.y = 200;
-            bola.vx = 0;
-            bola.vy = 0;
-        }
+        function update() {
+            bola.x += bola.vx; bola.y += bola.vy;
+            bola.vx *= 0.98; bola.vy *= 0.98;
 
-        function ganhar() {
-            if (jogando) {
-                saldo += 20; // Devolve os 10 e ganha mais 10
-                atualizarSaldo();
-                msgElement.innerHTML = "🏆 VOCÊ GANHOU! + R$ 10,00";
-                msgElement.className = "msg win-flash";
-                jogando = false;
+            // Detectar se caiu na caçapa
+            let dist = Math.hypot(bola.x - cacapa.x, bola.y - cacapa.y);
+            if(dist < cacapa.r && Math.abs(bola.vx) > 0.1) {
+                ganhou();
+                bola.vx = 0; bola.vy = 0;
+                bola.x = canvas.width * 0.2; bola.y = canvas.height / 2;
+            }
+
+            if(charging) {
+                power = Math.min(power + 1.5, 100);
+                forceFill.style.width = power + '%';
             }
         }
 
-        function atualizarSaldo() {
-            saldoElement.innerText = `R$ ${saldo.toFixed(2)}`;
+        function ganhou() {
+            saldo += 50; // Prêmio
+            document.getElementById('saldo').innerText = saldo.toFixed(2);
+            winMsg.style.display = 'block';
+            createParticles(cacapa.x, cacapa.y);
+            setTimeout(() => { winMsg.style.display = 'none'; }, 2000);
         }
 
-        function disparar(e) {
-            if (jogando || saldo < 10) {
-                if (saldo < 10) msgElement.innerText = "Saldo insuficiente!";
-                return;
-            }
-
-            jogando = true;
-            saldo -= 10;
-            atualizarSaldo();
-            msgElement.className = "msg";
-            msgElement.innerText = "Tacada efetuada...";
-
-            const sorteio = Math.random();
-
-            if (sorteio > (1 - taxaRetencao)) {
-                // CASA GANHA: Desvia a bola
-                bola.vx = 18;
-                bola.vy = (Math.random() > 0.5 ? 2.5 : -2.5);
-                setTimeout(() => {
-                    if (jogando) msgElement.innerText = "❌ Quase! Tente novamente.";
-                }, 1000);
-            } else {
-                // JOGADOR GANHA: Vai reto
-                bola.vx = 18;
-                bola.vy = 0;
-            }
-        }
-
-        // Eventos para PC e Mobile
-        canvas.addEventListener('mousedown', disparar);
+        // Controles Touch
         canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            disparar();
+            if(bola.vx === 0) { charging = true; power = 0; }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            if(!charging) return;
+            charging = false;
+            
+            saldo -= 10; // Custo da tacada
+            document.getElementById('saldo').innerText = saldo.toFixed(2);
+
+            let erro = (Math.random() < taxaRetencao) ? (Math.random()-0.5)*0.15 : 0;
+            bola.vx = (power/5);
+            bola.vy = erro * 20;
+            forceFill.style.width = '0%';
         });
 
         draw();
