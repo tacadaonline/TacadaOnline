@@ -79,15 +79,30 @@ let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#ffd700" };
 let hole = { x: 0, y: 0, r: 11 };
 
 function sortearPosicoes() {
-    const m = 2;
+    const m = 9;
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
-    dourada.x = (hole.x < canvas.width/2) ? canvas.width * 0.6 : canvas.width * 0.4;
-    branca.x = (hole.x < canvas.width/2) ? canvas.width * 0.85 : canvas.width * 0.15;
-    dourada.y = (hole.y < canvas.height/2) ? canvas.height * 0.6 : canvas.height * 0.4;
-    branca.y = (hole.y < canvas.height/2) ? canvas.height * 0.8 : canvas.height * 0.2;
+
+    // Define um ângulo aleatório (entre 15 e 75 graus em radianos) 
+    // para que as bolas não fiquem sempre na mesma linha reta
+    let anguloBase = (Math.random() * (Math.PI / 3)) + Math.PI / 12;
+
+    // Distâncias da caçapa
+    let distDourada = canvas.width * 0.45;
+    let distBranca = canvas.width * 0.75;
+
+    // Inverte o ângulo baseado em qual canto a caçapa está
+    let dirX = (hole.x < canvas.width / 2) ? 1 : -1;
+    let dirY = (hole.y < canvas.height / 2) ? 1 : -1;
+
+    dourada.x = hole.x + (Math.cos(anguloBase) * distDourada * dirX);
+    dourada.y = hole.y + (Math.sin(anguloBase) * distDourada * dirY);
+
+    branca.x = hole.x + (Math.cos(anguloBase) * distBranca * dirX);
+    branca.y = hole.y + (Math.sin(anguloBase) * distBranca * dirY);
+
     branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
 }
 
