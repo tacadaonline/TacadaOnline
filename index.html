@@ -43,11 +43,11 @@
 
 <script>
 /* ===== ÁUDIOS ===== */
-const somTacada = new Audio('https://s3.amazonaws.com'); 
-const somColisao = new Audio('https://assets.mixkit.co');
-const somCaçapa = new Audio('https://assets.mixkit.co');
-const somErro = new Audio('https://assets.mixkit.co');
-const somClique = new Audio('https://assets.mixkit.co');
+const somTacada  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-billiard-ball-hit-2148.mp3");
+const somColisao = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-wood-hit-2152.mp3");
+const somCaçapa  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3");
+const somErro    = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3");
+const somClique  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3");
 
 function tocar(s) { s.currentTime = 0; s.play().catch(()=>{}); }
 
