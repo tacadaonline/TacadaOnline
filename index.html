@@ -3,20 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold Pro - Branca x Dourada</title>
+    <title>Sinuca Gold - Classic Physics</title>
     <style>
         body { background: #0a0a0a; color: gold; font-family: 'Arial', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; touch-action: none; }
         .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: #111; border-bottom: 2px solid #222; }
         .stat-box { text-align: center; }
         .stat-value { font-size: 18px; font-weight: bold; color: #fff; }
+        
         #bet-selector { margin: 10px 0; display: flex; gap: 5px; z-index: 20; align-items: center; }
         .bet-btn, #custom-bet { background: #222; border: 1px solid #444; color: #aaa; padding: 8px 10px; border-radius: 4px; font-size: 12px; transition: 0.2s; }
-        .active-bet { border-color: gold !important; color: gold !important; background: #332b00 !important; }
+        .active-bet { border-color: gold !important; color: gold !important; background: #332b00 !important; box-shadow: 0 0 10px rgba(255,215,0,0.2); }
         #custom-bet { width: 60px; color: #fff; text-align: center; outline: none; }
+
         canvas { background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); border: 6px solid #3e2723; border-radius: 12px; }
         #timer-container { width: 92%; height: 6px; background: #222; margin-top: 8px; border-radius: 10px; overflow: hidden; }
         #timer-fill { width: 100%; height: 100%; background: #ff4444; }
-        #msg-status { position: absolute; top: 55%; font-size: 30px; font-weight: bold; display: none; z-index: 100; text-align: center; width: 100%; text-shadow: 2px 2px 5px #000; }
+        #msg-status { position: absolute; top: 50%; transform: translateY(-50%); font-size: 30px; font-weight: bold; display: none; z-index: 100; text-align: center; width: 100%; text-shadow: 2px 2px 5px #000; }
     </style>
 </head>
 <body>
@@ -55,15 +57,14 @@
         const multiplicador = 2.0;
 
         let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
-        let animandoTaco = false, tacoAvanco = 0;
         let timeLeft = 3.00, timerAtivo = true, aguardandoParar = false;
         
-        let branca = { x: canvas.width * 0.8, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
+        let branca = { x: canvas.width * 0.85, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
         let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
-        const cacapa = { x: 30, y: 30, r: 18 };
+        const cacapa = { x: 30, y: 30, r: 16 };
 
         function selectBet(val, btn) {
-            if(aguardandoParar || animandoTaco) return;
+            if(aguardandoParar) return;
             valorAposta = val;
             resetSelection();
             btn.classList.add('active-bet');
@@ -72,7 +73,7 @@
         }
 
         function selectCustom() {
-            if(aguardandoParar || animandoTaco) return;
+            if(aguardandoParar) return;
             resetSelection();
             customInput.classList.add('active-bet');
             updateCustomValue(customInput.value);
@@ -81,6 +82,11 @@
         function resetSelection() {
             document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
             customInput.classList.remove('active-bet');
+        }
+
+        function updateCustomValue(val) {
+            valorAposta = parseFloat(val) || 0;
+            atualizarLucro();
         }
 
         function atualizarLucro() {
@@ -92,17 +98,12 @@
             ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
 
-            // Taco na Bola Branca
-            if(charging || animandoTaco) {
-                let distTaco = charging ? (20 + power) : (20 + power - tacoAvanco);
-                let tacoX = branca.x - Math.cos(angle) * distTaco;
-                let tacoY = branca.y - Math.sin(angle) * distTaco;
-                ctx.save();
-                ctx.translate(tacoX, tacoY);
-                ctx.rotate(angle);
-                ctx.fillStyle = '#4e342e'; ctx.fillRect(-150, -4, 150, 8);
-                ctx.fillStyle = '#fff'; ctx.fillRect(0, -4, 5, 8);
-                ctx.restore();
+            if(charging) {
+                ctx.beginPath();
+                ctx.moveTo(branca.x, branca.y);
+                ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
+                ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                ctx.stroke();
             }
 
             [branca, dourada].forEach(b => {
@@ -115,19 +116,11 @@
         }
 
         function update() {
-            if(timerAtivo && !aguardandoParar && !animandoTaco) {
+            if(timerAtivo && !aguardandoParar) {
                 timeLeft -= 1/60;
                 document.getElementById('timer-text').innerText = Math.max(0, timeLeft).toFixed(2);
                 timerFill.style.width = (timeLeft / 3 * 100) + "%";
                 if(timeLeft <= 0) { timerAtivo = false; finalizarRodada(false, "TEMPO ESGOTADO!"); }
-            }
-
-            if(animandoTaco) {
-                tacoAvanco += 20; 
-                if(tacoAvanco >= (20 + power)) {
-                    animandoTaco = false;
-                    realizarTacada();
-                }
             }
 
             [branca, dourada].forEach(b => {
@@ -147,7 +140,7 @@
                 let speedBranca = Math.hypot(branca.vx, branca.vy);
                 dourada.vx = Math.cos(collisionAngle) * speedBranca * 0.9;
                 dourada.vy = Math.sin(collisionAngle) * speedBranca * 0.9;
-                branca.vx *= -0.4; branca.vy *= -0.4;
+                branca.vx *= -0.3; branca.vy *= -0.3;
             }
 
             // Vitória (Dourada na Caçapa)
@@ -158,15 +151,6 @@
             if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) finalizarRodada(false);
         }
 
-        function realizarTacada() {
-            saldo -= valorAposta;
-            saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
-            branca.vx = Math.cos(angle) * (power / 5);
-            branca.vy = Math.sin(angle) * (power / 5);
-            aguardandoParar = true;
-            tacoAvanco = 0; power = 0;
-        }
-
         function finalizarRodada(acertou, msg) {
             if(!aguardandoParar && !acertou && !msg) return;
             aguardandoParar = false; timerAtivo = false;
@@ -174,9 +158,11 @@
                 let win = valorAposta * multiplicador;
                 saldo += win;
                 showMsg(`GANHOU R$ ${win.toFixed(2)}!`, "gold");
-            } else { showMsg(msg || "ERROU!", "#ff4444"); }
+            } else {
+                showMsg(msg || "ERROU!", "#ff4444");
+            }
             saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
-            setTimeout(reset, 1200);
+            setTimeout(reset, 1500);
         }
 
         function showMsg(t, c) {
@@ -187,14 +173,14 @@
 
         function reset() {
             branca.vx = 0; branca.vy = 0;
-            branca.x = canvas.width * 0.8; branca.y = canvas.height * 0.8;
+            branca.x = canvas.width * 0.85; branca.y = canvas.height * 0.8;
             dourada.vx = 0; dourada.vy = 0;
             dourada.x = canvas.width / 2; dourada.y = canvas.height / 2;
             timeLeft = 3.00; timerAtivo = true; aguardandoParar = false;
         }
 
         canvas.addEventListener('touchstart', (e) => {
-            if(branca.vx === 0 && !animandoTaco && saldo >= valorAposta && valorAposta > 0) {
+            if(branca.vx === 0 && saldo >= valorAposta && valorAposta > 0) {
                 charging = true;
                 dragStart = { x: e.touches.clientX, y: e.touches.clientY };
             }
@@ -205,13 +191,19 @@
             let dx = dragStart.x - e.touches.clientX;
             let dy = dragStart.y - e.touches.clientY;
             angle = Math.atan2(dy, dx);
-            power = Math.min(Math.hypot(dx, dy) / 2, 90);
+            power = Math.min(Math.hypot(dx, dy) / 2, 80);
         });
 
         canvas.addEventListener('touchend', () => {
             if(!charging) return;
             charging = false;
-            if(power > 5) animandoTaco = true;
+            if(power > 5) {
+                saldo -= valorAposta;
+                saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+                branca.vx = Math.cos(angle) * (power / 5);
+                branca.vy = Math.sin(angle) * (power / 5);
+                aguardandoParar = true;
+            }
         });
 
         draw();
