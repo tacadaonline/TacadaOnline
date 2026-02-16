@@ -3,36 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold Pro</title>
+    <title>Sinuca Gold - 7 Segundos</title>
     <style>
         body { 
             background: #0f0f0f; color: gold; font-family: 'Arial Black', sans-serif; 
             margin: 0; overflow: hidden; display: flex; flex-direction: column; 
             align-items: center; height: 100vh; touch-action: none;
         }
-        .header { margin-top: 20px; text-align: center; z-index: 10; }
-        #saldo-container { font-size: 28px; text-shadow: 0 0 10px #ffcc00; }
+        .header { margin-top: 15px; text-align: center; z-index: 10; width: 100%; }
+        #stats { display: flex; justify-content: space-around; width: 100%; font-size: 22px; }
+        #timer-display { color: #ff4444; text-shadow: 0 0 10px #f00; font-size: 32px; }
+        
         canvas { 
             background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); 
             border: 8px solid #3e2723; border-radius: 15px; 
-            box-shadow: 0 0 30px rgba(0,0,0,0.8); margin-top: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8); margin-top: 10px;
         }
         #force-bar-container {
             width: 80%; height: 15px; background: #222; 
-            border: 2px solid gold; margin-top: 20px; border-radius: 10px; overflow: hidden;
+            border: 2px solid gold; margin-top: 15px; border-radius: 10px; overflow: hidden;
         }
         #force-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0, #f00); }
-        #win-msg {
+        #msg-status {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 50px; color: #fff; text-shadow: 0 0 20px #ff0;
-            display: none; z-index: 100; pointer-events: none;
+            font-size: 40px; color: #fff; text-shadow: 0 0 20px #ff0;
+            display: none; z-index: 100; text-align: center;
         }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div id="saldo-container">R$ <span id="saldo">100.00</span></div>
+        <div id="stats">
+            <div>💰 R$ <span id="saldo">100.00</span></div>
+            <div id="timer-display">07.00</div>
+        </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -41,13 +46,14 @@
         <div id="force-fill"></div>
     </div>
 
-    <div id="win-msg">PRECISE! 💰</div>
+    <div id="msg-status"></div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const forceFill = document.getElementById('force-fill');
-        const winMsg = document.getElementById('win-msg');
+        const msgStatus = document.getElementById('msg-status');
+        const timerDisplay = document.getElementById('timer-display');
 
         canvas.width = window.innerWidth * 0.92;
         canvas.height = canvas.width * 0.6;
@@ -55,37 +61,33 @@
         let saldo = 100.00;
         let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
         let particles = [];
+        let aguardandoParar = false;
+        
+        // SISTEMA DE TEMPO
+        let timeLeft = 7.00;
+        let timerAtivo = true;
 
-        // Configurações de jogo
-        const bola = { x: canvas.width * 0.15, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8 };
-        const obstaculo = { x: canvas.width / 2, y: canvas.height / 2, r: 8 }; // Bola fixa no meio
-        const cacapa = { x: canvas.width - 35, y: 35, r: 12 }; // Caçapa bem pequena (boca fechada)
+        let branca = { x: canvas.width * 0.2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#fff' };
+        let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
+        const cacapa = { x: canvas.width - 35, y: 35, r: 14 };
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Caçapa (Boca fechada)
+            // Caçapa
             ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 3; ctx.stroke();
-
-            // Obstáculo (Bola Fixa Dourada)
-            let gradObs = ctx.createRadialGradient(obstaculo.x-2, obstaculo.y-2, 1, obstaculo.x, obstaculo.y, obstaculo.r);
-            gradObs.addColorStop(0, '#fff700'); gradObs.addColorStop(1, '#b8860b');
-            ctx.fillStyle = gradObs;
-            ctx.beginPath(); ctx.arc(obstaculo.x, obstaculo.y, obstaculo.r, 0, Math.PI*2); ctx.fill();
 
             // Mira
             if(charging) {
                 ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.moveTo(bola.x, bola.y);
-                ctx.lineTo(bola.x + Math.cos(angle) * (power * 1.2), bola.y + Math.sin(angle) * (power * 1.2));
+                ctx.moveTo(branca.x, branca.y);
+                ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                 ctx.stroke();
             }
 
-            // Partículas
+            // Partículas e Bolas
             particles.forEach((p, i) => {
                 ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
                 ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
@@ -94,62 +96,100 @@
             });
             ctx.globalAlpha = 1;
 
-            // Bola Branca
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(bola.x, bola.y, bola.r, 0, Math.PI*2); ctx.fill();
+            [branca, dourada].forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+            });
 
             update();
             requestAnimationFrame(draw);
         }
 
         function update() {
-            bola.x += bola.vx; bola.y += bola.vy;
-            bola.vx *= 0.985; bola.vy *= 0.985;
-
-            if(Math.hypot(bola.vx, bola.vy) < 0.2) { bola.vx = 0; bola.vy = 0; }
-
-            // Colisão com Obstáculo Fixo (Física de Rebote)
-            let dx = bola.x - obstaculo.x;
-            let dy = bola.y - obstaculo.y;
-            let distancia = Math.hypot(dx, dy);
-
-            if (distancia < bola.r + obstaculo.r) {
-                let colAngle = Math.atan2(dy, dx);
-                let speed = Math.hypot(bola.vx, bola.vy);
-                bola.vx = Math.cos(colAngle) * speed * 0.8;
-                bola.vy = Math.sin(colAngle) * speed * 0.8;
-                // Impedir sobreposição
-                bola.x = obstaculo.x + Math.cos(colAngle) * (bola.r + obstaculo.r);
-                bola.y = obstaculo.y + Math.sin(colAngle) * (bola.r + obstaculo.r);
+            // Lógica do Timer
+            if(timerAtivo && !aguardandoParar) {
+                timeLeft -= 1/60;
+                timerDisplay.innerText = Math.max(0, timeLeft).toFixed(2);
+                if(timeLeft <= 0) {
+                    timerAtivo = false;
+                    timeoutPenalidade();
+                }
             }
 
-            // Bordas
-            if(bola.x + bola.r > canvas.width || bola.x - bola.r < 0) bola.vx *= -0.7;
-            if(bola.y + bola.r > canvas.height || bola.y - bola.r < 0) bola.vy *= -0.7;
+            // Movimentação
+            [branca, dourada].forEach(b => {
+                b.x += b.vx; b.y += b.vy;
+                b.vx *= 0.985; b.vy *= 0.985;
+                if(Math.hypot(b.vx, b.vy) < 0.15) { b.vx = 0; b.vy = 0; }
+                
+                if(b.x + b.r > canvas.width || b.x - b.r < 0) b.vx *= -0.7;
+                if(b.y + b.r > canvas.height || b.y - b.r < 0) b.vy *= -0.7;
+            });
 
-            // Vitória (Caçapa)
-            let dCacapa = Math.hypot(bola.x - cacapa.x, bola.y - cacapa.y);
-            if(dCacapa < cacapa.r) {
-                ganhou();
-                resetBola();
+            // Colisão Branca x Dourada
+            let dx = dourada.x - branca.x;
+            let dy = dourada.y - branca.y;
+            if(Math.hypot(dx, dy) < branca.r + dourada.r) {
+                let collisionAngle = Math.atan2(dy, dx);
+                let speed = Math.hypot(branca.vx, branca.vy);
+                dourada.vx = Math.cos(collisionAngle) * speed * 0.9;
+                dourada.vy = Math.sin(collisionAngle) * speed * 0.9;
+                branca.vx *= -0.2; branca.vy *= -0.2;
+            }
+
+            // Vitória
+            if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < cacapa.r) {
+                finalizarRodada(true);
+            }
+
+            // Erro por parada
+            if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) {
+                finalizarRodada(false);
             }
         }
 
-        function ganhou() {
-            saldo += 100; // Dobrou o prêmio pela dificuldade
+        function timeoutPenalidade() {
+            saldo -= 5;
             document.getElementById('saldo').innerText = saldo.toFixed(2);
-            winMsg.style.display = 'block';
-            for(let i=0; i<20; i++) particles.push({x: cacapa.x, y: cacapa.y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color: 'gold'});
-            setTimeout(() => { winMsg.style.display = 'none'; }, 1000);
+            exibirMensagem("TEMPO ESGOTADO! -R$5", "#ff4444");
+            setTimeout(resetPosicoes, 1500);
         }
 
-        function resetBola() {
-            bola.vx = 0; bola.vy = 0;
-            bola.x = canvas.width * 0.15; bola.y = canvas.height * 0.8;
+        function finalizarRodada(acertou) {
+            if(!aguardandoParar && !acertou) return;
+            aguardandoParar = false;
+            timerAtivo = false;
+            
+            if(acertou) {
+                saldo += 150;
+                exibirMensagem("ACERTOU! +R$150", "gold");
+            } else {
+                exibirMensagem("ERROU!", "#ff4444");
+            }
+            document.getElementById('saldo').innerText = saldo.toFixed(2);
+            setTimeout(resetPosicoes, 1500);
+        }
+
+        function resetPosicoes() {
+            branca.vx = 0; branca.vy = 0;
+            branca.x = canvas.width * 0.2; branca.y = canvas.height / 2;
+            dourada.vx = 0; dourada.vy = 0;
+            dourada.x = canvas.width / 2; dourada.y = canvas.height / 2;
+            timeLeft = 7.00;
+            timerAtivo = true;
+            aguardandoParar = false;
+        }
+
+        function exibirMensagem(texto, cor) {
+            msgStatus.innerText = texto; msgStatus.style.color = cor;
+            msgStatus.style.display = 'block';
+            setTimeout(() => { msgStatus.style.display = 'none'; }, 1500);
         }
 
         canvas.addEventListener('touchstart', (e) => {
-            if(bola.vx === 0) { charging = true; dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+            if(branca.vx === 0 && timerAtivo) {
+                charging = true; dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
         });
 
         canvas.addEventListener('touchmove', (e) => {
@@ -167,8 +207,9 @@
             if(power > 5) {
                 saldo -= 10;
                 document.getElementById('saldo').innerText = saldo.toFixed(2);
-                bola.vx = Math.cos(angle) * (power / 5);
-                bola.vy = Math.sin(angle) * (power / 5);
+                branca.vx = Math.cos(angle) * (power / 5);
+                branca.vy = Math.sin(angle) * (power / 5);
+                aguardandoParar = true;
             }
             power = 0; forceFill.style.width = '0%';
         });
