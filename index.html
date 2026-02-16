@@ -42,14 +42,28 @@
 <div id="msg"></div>
 
 <script>
-/* ===== ÁUDIOS ===== */
-const somTacada = new Audio('https://s3.amazonaws.com'); 
-const somColisao = new Audio('https://assets.mixkit.co');
-const somCaçapa = new Audio('https://assets.mixkit.co');
-const somErro = new Audio('https://assets.mixkit.co');
-const somClique = new Audio('https://assets.mixkit.co');
+/* ===== ÁUDIOS (VERSÃO FUNCIONAL) ===== */
+// Substitua estas URLs pelos links que você gerou no ScreenApp
+const somTacada = new Audio('https://screenapp.io/audio/tacada.mp3'); 
+const somColisao = new Audio('https://screenapp.io/audio/colisao.mp3');
+const somCaçapa = new Audio('https://screenapp.io/audio/vitoria.mp3');
+const somErro = new Audio('https://screenapp.io/audio/erro.mp3');
+const somClique = new Audio('https://screenapp.io/audio/clique.mp3');
 
-function tocar(s) { s.currentTime = 0; s.play().catch(()=>{}); }
+// Configurações de volume
+somTacada.volume = 0.4;
+somColisao.volume = 0.3;
+somCaçapa.volume = 0.5;
+somErro.volume = 0.4;
+somClique.volume = 0.2;
+
+// Função melhorada para tocar sons
+function tocar(som) {
+    som.currentTime = 0;
+    som.play().catch(erro => {
+        console.log("Áudio bloqueado pelo navegador, aguardando interação");
+    });
+}
 
 /* ===== CONFIGURAÇÕES RTP STEALTH ===== */
 let dificuldadeRTP = 0.5; // 0.3 é indetectável. 0.9 é "azar" total.
