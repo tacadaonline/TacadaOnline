@@ -228,23 +228,44 @@ function draw() {
 function finish(win, msg) {
     if (state !== "PLAYING") return;
     state = "RESULT";
+    timerIniciado = false; // Para o cronômetro imediatamente
 
     if (win) {
         tocar(somCaçapa);
-
-        // retorno total = aposta + lucro
         let retornoTotal = lockedBet * 2;
-
         saldo += retornoTotal;
-
         show(`GREEN +R$ ${lockedBet.toFixed(2)}`, "gold");
     } else {
         tocar(somErro);
         show(msg || "LOSS", "#ff4444");
     }
 
+    // Zera as velocidades para as bolas pararem imediatamente no fim
+    branca.vx = 0; branca.vy = 0;
+    dourada.vx = 0; dourada.vy = 0;
+
     saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     setTimeout(reset, 1500);
+}
+
+function reset() {
+    // Garante que tudo pare
+    branca.vx = 0; branca.vy = 0;
+    dourada.vx = 0; dourada.vy = 0;
+    power = 0;
+    charging = false;
+
+    // Sorteia novas posições para a nova partida
+    sortearPosicoes();
+    
+    // Reseta interface e tempo
+    time = tempoJogo; 
+    tempoEl.innerText = tempoJogo.toFixed(2); 
+    timerIniciado = false;
+    state = "BETTING";
+    
+    // Reativa o botão de confirmação
+    document.getElementById("confirm").style.opacity = "1";
 }
 
 function reset() {
