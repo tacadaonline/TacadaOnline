@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold Mobile</title>
+    <title>Sinuca Gold Pro</title>
     <style>
         body { 
             background: #0f0f0f; color: gold; font-family: 'Arial Black', sans-serif; 
@@ -18,13 +18,13 @@
             box-shadow: 0 0 30px rgba(0,0,0,0.8); margin-top: 20px;
         }
         #force-bar-container {
-            width: 80%; height: 20px; background: #222; 
+            width: 80%; height: 15px; background: #222; 
             border: 2px solid gold; margin-top: 20px; border-radius: 10px; overflow: hidden;
         }
         #force-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0, #f00); }
         #win-msg {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 60px; color: #fff; text-shadow: 0 0 20px #ff0;
+            font-size: 50px; color: #fff; text-shadow: 0 0 20px #ff0;
             display: none; z-index: 100; pointer-events: none;
         }
     </style>
@@ -41,7 +41,7 @@
         <div id="force-fill"></div>
     </div>
 
-    <div id="win-msg">GANHOU! 💰</div>
+    <div id="win-msg">PRECISE! 💰</div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -49,123 +49,108 @@
         const forceFill = document.getElementById('force-fill');
         const winMsg = document.getElementById('win-msg');
 
-        canvas.width = window.innerWidth * 0.9;
+        canvas.width = window.innerWidth * 0.92;
         canvas.height = canvas.width * 0.6;
 
         let saldo = 100.00;
-        let power = 0;
-        let charging = false;
+        let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
         let particles = [];
-        let dragStart = { x: 0, y: 0 };
-        let angle = 0;
 
-        // BOLA MENOR E POSIÇÃO INICIAL
-        let bola = { x: canvas.width * 0.15, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8 };
-        // CAÇAPA NO CANTO E MENOR
-        let cacapa = { x: canvas.width - 40, y: 40, r: 18 };
-
-        function createParticles(x, y) {
-            for(let i=0; i<30; i++) {
-                particles.push({
-                    x, y, 
-                    vx: (Math.random()-0.5)*10, 
-                    vy: (Math.random()-0.5)*10, 
-                    life: 1.0,
-                    color: `hsl(${Math.random() * 50 + 40}, 100%, 50%)`
-                });
-            }
-        }
+        // Configurações de jogo
+        const bola = { x: canvas.width * 0.15, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8 };
+        const obstaculo = { x: canvas.width / 2, y: canvas.height / 2, r: 8 }; // Bola fixa no meio
+        const cacapa = { x: canvas.width - 35, y: 35, r: 12 }; // Caçapa bem pequena (boca fechada)
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Caçapa com profundidade
-            let grad = ctx.createRadialGradient(cacapa.x, cacapa.y, 5, cacapa.x, cacapa.y, cacapa.r);
-            grad.addColorStop(0, '#111');
-            grad.addColorStop(1, '#000');
-            ctx.fillStyle = grad;
+            // Caçapa (Boca fechada)
+            ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 3; ctx.stroke();
 
-            // Mira (Linha de Guia)
+            // Obstáculo (Bola Fixa Dourada)
+            let gradObs = ctx.createRadialGradient(obstaculo.x-2, obstaculo.y-2, 1, obstaculo.x, obstaculo.y, obstaculo.r);
+            gradObs.addColorStop(0, '#fff700'); gradObs.addColorStop(1, '#b8860b');
+            ctx.fillStyle = gradObs;
+            ctx.beginPath(); ctx.arc(obstaculo.x, obstaculo.y, obstaculo.r, 0, Math.PI*2); ctx.fill();
+
+            // Mira
             if(charging) {
                 ctx.beginPath();
                 ctx.setLineDash([5, 5]);
                 ctx.moveTo(bola.x, bola.y);
-                let guideX = bola.x + Math.cos(angle) * (power * 1.5);
-                let guideY = bola.y + Math.sin(angle) * (power * 1.5);
-                ctx.lineTo(guideX, guideY);
-                ctx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+                ctx.lineTo(bola.x + Math.cos(angle) * (power * 1.2), bola.y + Math.sin(angle) * (power * 1.2));
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                 ctx.stroke();
-                ctx.setLineDash([]);
             }
 
             // Partículas
             particles.forEach((p, i) => {
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life;
-                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
-                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+                p.x += p.vx; p.y += p.vy; p.life -= 0.03;
                 if(p.life <= 0) particles.splice(i, 1);
             });
             ctx.globalAlpha = 1;
 
-            // Bola
+            // Bola Branca
             ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 8; ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.beginPath(); ctx.arc(bola.x, bola.y, bola.r, 0, Math.PI*2); ctx.fill();
-            ctx.shadowBlur = 0;
 
             update();
             requestAnimationFrame(draw);
         }
 
         function update() {
-            bola.x += bola.vx; 
-            bola.y += bola.vy;
-            bola.vx *= 0.985; 
-            bola.vy *= 0.985;
+            bola.x += bola.vx; bola.y += bola.vy;
+            bola.vx *= 0.985; bola.vy *= 0.985;
 
             if(Math.hypot(bola.vx, bola.vy) < 0.2) { bola.vx = 0; bola.vy = 0; }
 
-            // Rebote nas bordas
-            if(bola.x + bola.r > canvas.width || bola.x - bola.r < 0) {
-                bola.vx *= -0.7;
-                bola.x = (bola.x < canvas.width/2) ? bola.r : canvas.width - bola.r;
-            }
-            if(bola.y + bola.r > canvas.height || bola.y - bola.r < 0) {
-                bola.vy *= -0.7;
-                bola.y = (bola.y < canvas.height/2) ? bola.r : canvas.height - bola.r;
+            // Colisão com Obstáculo Fixo (Física de Rebote)
+            let dx = bola.x - obstaculo.x;
+            let dy = bola.y - obstaculo.y;
+            let distancia = Math.hypot(dx, dy);
+
+            if (distancia < bola.r + obstaculo.r) {
+                let colAngle = Math.atan2(dy, dx);
+                let speed = Math.hypot(bola.vx, bola.vy);
+                bola.vx = Math.cos(colAngle) * speed * 0.8;
+                bola.vy = Math.sin(colAngle) * speed * 0.8;
+                // Impedir sobreposição
+                bola.x = obstaculo.x + Math.cos(colAngle) * (bola.r + obstaculo.r);
+                bola.y = obstaculo.y + Math.sin(colAngle) * (bola.r + obstaculo.r);
             }
 
-            // Detectar caçapa
-            let dist = Math.hypot(bola.x - cacapa.x, bola.y - cacapa.y);
-            if(dist < cacapa.r && Math.hypot(bola.vx, bola.vy) > 0.5) {
+            // Bordas
+            if(bola.x + bola.r > canvas.width || bola.x - bola.r < 0) bola.vx *= -0.7;
+            if(bola.y + bola.r > canvas.height || bola.y - bola.r < 0) bola.vy *= -0.7;
+
+            // Vitória (Caçapa)
+            let dCacapa = Math.hypot(bola.x - cacapa.x, bola.y - cacapa.y);
+            if(dCacapa < cacapa.r) {
                 ganhou();
                 resetBola();
             }
         }
 
         function ganhou() {
-            saldo += 50;
+            saldo += 100; // Dobrou o prêmio pela dificuldade
             document.getElementById('saldo').innerText = saldo.toFixed(2);
             winMsg.style.display = 'block';
-            createParticles(cacapa.x, cacapa.y);
-            setTimeout(() => { winMsg.style.display = 'none'; }, 1500);
+            for(let i=0; i<20; i++) particles.push({x: cacapa.x, y: cacapa.y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color: 'gold'});
+            setTimeout(() => { winMsg.style.display = 'none'; }, 1000);
         }
 
         function resetBola() {
             bola.vx = 0; bola.vy = 0;
-            bola.x = canvas.width * 0.15; 
-            bola.y = canvas.height * 0.8;
+            bola.x = canvas.width * 0.15; bola.y = canvas.height * 0.8;
         }
 
         canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if(bola.vx === 0 && bola.vy === 0) {
-                charging = true;
-                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            }
-        }, {passive: false});
+            if(bola.vx === 0) { charging = true; dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+        });
 
         canvas.addEventListener('touchmove', (e) => {
             if(!charging) return;
@@ -174,7 +159,7 @@
             angle = Math.atan2(dy, dx);
             power = Math.min(Math.hypot(dx, dy) / 2, 100);
             forceFill.style.width = power + '%';
-        }, {passive: false});
+        });
 
         canvas.addEventListener('touchend', () => {
             if(!charging) return;
@@ -185,8 +170,7 @@
                 bola.vx = Math.cos(angle) * (power / 5);
                 bola.vy = Math.sin(angle) * (power / 5);
             }
-            power = 0;
-            forceFill.style.width = '0%';
+            power = 0; forceFill.style.width = '0%';
         });
 
         draw();
