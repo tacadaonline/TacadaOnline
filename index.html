@@ -24,8 +24,8 @@
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (1.1x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 11.00</span></div>
-  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">1.50</span></div>
+  <div class="stat-box"><span class="stat-label">Retorno (2.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 11.00</span></div>
+  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
 <div id="bet-panel">
@@ -52,8 +52,8 @@ const somClique = new Audio('https://assets.mixkit.co');
 function tocar(s) { s.currentTime = 0; s.play().catch(()=>{}); }
 
 /* ===== CONFIGURAÇÕES RTP STEALTH ===== */
-let dificuldadeRTP = 0.3; // 0.3 é indetectável. 0.9 é "azar" total.
-const multPagamento = 1.1;
+let dificuldadeRTP = 0.5; // 0.3 é indetectável. 0.9 é "azar" total.
+const multPagamento = 2.0;
 const tempoJogo = 2.50;
 
 const canvas = document.getElementById("game");
