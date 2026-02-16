@@ -85,28 +85,34 @@ function sortearPosicoes() {
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
 
-    // 1. Ângulo: Fixamos um ângulo mais centralizado (45 graus) para fugir das quinas
-    // Adicionamos uma pequena variação (Math.random) para não ser sempre igual
-    let anguloBase = (Math.PI / 4) + (Math.random() * 0.2 - 0.1);
+    // --- INFINITAS POSIÇÕES ---
+    
+    // 1. Ângulo totalmente aleatório entre 10° e 80° para nunca bater na quina
+    // Isso garante que elas nunca fiquem na mesma linha
+    let anguloRandom = (Math.random() * (Math.PI / 2.5)) + (Math.PI / 18);
 
-    // 2. Distâncias: Aumentamos para afastar da caçapa e aproximamos os valores entre as bolas
-    // distDourada: O quão longe a amarela está do buraco
-    // distBranca: O quão longe a branca está do buraco
-    let distDourada = canvas.width * 0.65; // Estava em 0.4~0.5
-    let distBranca = canvas.width * 0.82;  // Estava em 0.75~0.85
+    // 2. Distância da Dourada: Varia entre 60% e 75% da largura da mesa (Sempre longe)
+    let distDourada = canvas.width * (0.6 + Math.random() * 0.15);
 
-    // Ajuste de direção baseado no canto
+    // 3. Proximidade: A Branca ficará apenas entre 50 a 80 pixels de distância da Dourada
+    // Isso mantém a "distância curta uma da outra" que você pediu
+    let gapEntreBolas = 55 + (Math.random() * 25); 
+    let distBranca = distDourada + gapEntreBolas;
+
+    // Ajuste de quadrante baseado no canto da caçapa
     let dirX = (hole.x < canvas.width / 2) ? 1 : -1;
     let dirY = (hole.y < canvas.height / 2) ? 1 : -1;
 
-    // Posicionamento
-    dourada.x = hole.x + (Math.cos(anguloBase) * distDourada * dirX);
-    dourada.y = hole.y + (Math.sin(anguloBase) * distDourada * dirY);
+    // Cálculo das coordenadas finais (x, y)
+    dourada.x = hole.x + (Math.cos(anguloRandom) * distDourada * dirX);
+    dourada.y = hole.y + (Math.sin(anguloRandom) * distDourada * dirY);
 
-    branca.x = hole.x + (Math.cos(anguloBase) * distBranca * dirX);
-    branca.y = hole.y + (Math.sin(anguloBase) * distBranca * dirY);
+    branca.x = hole.x + (Math.cos(anguloRandom) * distBranca * dirX);
+    branca.y = hole.y + (Math.sin(anguloRandom) * distBranca * dirY);
 
-    branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
+    // Reset de velocidades
+    branca.vx = 0; branca.vy = 0; 
+    dourada.vx = 0; dourada.vy = 0;
 }
 
 sortearPosicoes();
