@@ -1,257 +1,186 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sinuca Gold – Casino</title>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const timerFill = document.getElementById('timer-fill');
+const saldoDisplay = document.getElementById('saldo-display');
+const lucroPrevisto = document.getElementById('lucro-previsto');
+const customInput = document.getElementById('custom-bet');
 
-<style>
-body{
-  margin:0;
-  background:#0a0a0a;
-  color:gold;
-  font-family:Arial,sans-serif;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
+canvas.width = window.innerWidth * 0.94;
+canvas.height = canvas.width * 0.8;
+
+let saldo = 1000.00;
+let valorAposta = 10;
+const multiplicador = 2.0;
+
+let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
+let timeLeft = 3.00, timerAtivo = false, aguardandoParar = false; // timerAtivo começa false
+let apostaDebitada = false;
+
+let branca = { x: canvas.width * 0.85, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
+let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
+const cacapa = { x: 30, y: 30, r: 16 };
+
+function selectBet(val, btn) {
+    if(timerAtivo || aguardandoParar) return; // Bloqueia troca durante a jogada
+    valorAposta = val;
+    resetSelection();
+    btn.classList.add('active-bet');
+    customInput.value = "";
+    atualizarLucro();
 }
 
-.header{
-  width:100%;
-  display:flex;
-  justify-content:space-around;
-  padding:10px;
-  background:#111;
-  border-bottom:2px solid #222;
+function selectCustom() {
+    if(timerAtivo || aguardandoParar) return;
+    resetSelection();
+    customInput.classList.add('active-bet');
+    updateCustomValue(customInput.value);
 }
 
-.stat-value{color:#fff;font-weight:bold}
-
-#bet-panel{
-  margin:10px;
-  display:flex;
-  gap:8px;
+function resetSelection() {
+    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+    customInput.classList.remove('active-bet');
 }
 
-.bet-btn{
-  padding:8px 14px;
-  background:#222;
-  border:1px solid #444;
-  color:#aaa;
-  border-radius:5px;
+function updateCustomValue(val) {
+    valorAposta = parseFloat(val) || 0;
+    atualizarLucro();
 }
 
-.bet-btn.active{
-  color:gold;
-  border-color:gold;
-  background:#332b00;
+function atualizarLucro() {
+    lucroPrevisto.innerText = `R$ ${(valorAposta * multiplicador).toFixed(2)}`;
 }
 
-#confirm{
-  margin-bottom:10px;
-  padding:10px 30px;
-  background:gold;
-  color:#000;
-  border:none;
-  border-radius:6px;
-  font-weight:bold;
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
+
+    if(charging) {
+        ctx.beginPath();
+        ctx.moveTo(branca.x, branca.y);
+        ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.stroke();
+    }
+
+    [branca, dourada].forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+    });
+
+    update();
+    requestAnimationFrame(draw);
 }
 
-canvas{
-  background:radial-gradient(circle,#0b5e28 0%,#053a18 100%);
-  border:6px solid #3e2723;
-  border-radius:12px;
+function update() {
+    // O cronômetro só corre se timerAtivo for true (ativado no toque)
+    if(timerAtivo && !aguardandoParar) {
+        timeLeft -= 1/60;
+        document.getElementById('timer-text').innerText = Math.max(0, timeLeft).toFixed(2);
+        timerFill.style.width = (timeLeft / 3 * 100) + "%";
+        if(timeLeft <= 0) { 
+            timerAtivo = false; 
+            finalizarRodada(false, "TEMPO ESGOTADO!"); 
+        }
+    }
+
+    [branca, dourada].forEach(b => {
+        b.x += b.vx; b.y += b.vy;
+        b.vx *= 0.985; b.vy *= 0.985;
+        if(Math.hypot(b.vx, b.vy) < 0.15) { b.vx = 0; b.vy = 0; }
+        if(b.x - b.r < 0 || b.x + b.r > canvas.width) b.vx *= -0.8;
+        if(b.y - b.r < 0 || b.y + b.r > canvas.height) b.vy *= -0.8;
+    });
+
+    let dx = dourada.x - branca.x;
+    let dy = dourada.y - branca.y;
+    let dist = Math.hypot(dx, dy);
+    if(dist < branca.r + dourada.r) {
+        let collisionAngle = Math.atan2(dy, dx);
+        let speedBranca = Math.hypot(branca.vx, branca.vy);
+        dourada.vx = Math.cos(collisionAngle) * speedBranca * 0.9;
+        dourada.vy = Math.sin(collisionAngle) * speedBranca * 0.9;
+        branca.vx *= -0.3; branca.vy *= -0.3;
+    }
+
+    if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < cacapa.r) {
+        if(Math.hypot(dourada.vx, dourada.vy) > 0.1) finalizarRodada(true);
+    }
+
+    if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) {
+        finalizarRodada(false);
+    }
 }
 
-#msg{
-  position:absolute;
-  top:50%;
-  transform:translateY(-50%);
-  font-size:28px;
-  display:none;
-  font-weight:bold;
-}
-</style>
-</head>
+function finalizarRodada(acertou, msg) {
+    if(!aguardandoParar && !acertou && !msg) return;
+    aguardandoParar = false; 
+    timerAtivo = false; // Para o cronômetro
 
-<body>
-
-<div class="header">
-  <div>SALDO<br><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-  <div>APOSTA<br><span id="bet" class="stat-value">R$ 10.00</span></div>
-  <div>TEMPO<br><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
-</div>
-
-<div id="bet-panel">
-  <button class="bet-btn active" onclick="selectBet(10,this)">R$10</button>
-  <button class="bet-btn" onclick="selectBet(20,this)">R$20</button>
-  <button class="bet-btn" onclick="selectBet(50,this)">R$50</button>
-  <button class="bet-btn" onclick="selectBet(100,this)">R$100</button>
-</div>
-
-<button id="confirm" onclick="confirmBet()">CONFIRMAR APOSTA</button>
-
-<canvas id="game"></canvas>
-<div id="msg"></div>
-
-<script>
-/* ===== SETUP ===== */
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth*0.94;
-canvas.height=canvas.width*0.8;
-
-const saldoEl=document.getElementById("saldo");
-const betEl=document.getElementById("bet");
-const tempoEl=document.getElementById("tempo");
-const msgEl=document.getElementById("msg");
-
-let saldo=1000;
-let betValue=10;
-let lockedBet=0;
-let state="BETTING"; // BETTING | PLAYING | RESULT
-let time=3;
-
-/* ===== BALLS ===== */
-function ball(x,y,c){
-  return {x,y,vx:0,vy:0,r:9,color:c};
-}
-let branca=ball(canvas.width*0.85,canvas.height*0.8,"#fff");
-let dourada=ball(canvas.width/2,canvas.height/2,"#ffd700");
-const hole={x:30,y:30,r:18};
-
-/* ===== BET ===== */
-function selectBet(v,btn){
-  if(state!=="BETTING")return;
-  betValue=v;
-  betEl.innerText=`R$ ${v.toFixed(2)}`;
-  document.querySelectorAll(".bet-btn").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
+    if(acertou) {
+        let win = valorAposta * multiplicador;
+        saldo += win;
+        showMsg(`GANHOU R$ ${win.toFixed(2)}!`, "gold");
+    } else {
+        showMsg(msg || "ERROU!", "#ff4444");
+    }
+    saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+    setTimeout(reset, 1500);
 }
 
-function confirmBet(){
-  if(state!=="BETTING")return;
-  if(saldo<betValue){alert("Saldo insuficiente");return;}
-  lockedBet=betValue;
-  saldo-=lockedBet;
-  saldoEl.innerText=`R$ ${saldo.toFixed(2)}`;
-  state="PLAYING";
+function showMsg(t, c) {
+    const m = document.getElementById('msg-status');
+    m.innerText = t; m.style.color = c; m.style.display = 'block';
+    setTimeout(() => m.style.display = 'none', 1500);
 }
 
-/* ===== PHYSICS ===== */
-function move(b){
-  b.x+=b.vx;
-  b.y+=b.vy;
-  b.vx*=0.99;
-  b.vy*=0.99;
-  if(Math.abs(b.vx)<0.05)b.vx=0;
-  if(Math.abs(b.vy)<0.05)b.vy=0;
-  if(b.x-b.r<0||b.x+b.r>canvas.width)b.vx*=-0.8;
-  if(b.y-b.r<0||b.y+b.r>canvas.height)b.vy*=-0.8;
+function reset() {
+    branca.vx = 0; branca.vy = 0;
+    branca.x = canvas.width * 0.85; branca.y = canvas.height * 0.8;
+    dourada.vx = 0; dourada.vy = 0;
+    dourada.x = canvas.width / 2; dourada.y = canvas.height / 2;
+    timeLeft = 3.00; 
+    timerAtivo = false; // Resetado para falso para a próxima rodada
+    aguardandoParar = false;
+    apostaDebitada = false;
+    document.getElementById('timer-text').innerText = "03.00";
+    timerFill.style.width = "100%";
 }
 
-function collide(){
-  let dx=dourada.x-branca.x;
-  let dy=dourada.y-branca.y;
-  let d=Math.hypot(dx,dy);
-  if(d<branca.r+dourada.r){
-    let a=Math.atan2(dy,dx);
-    let v=Math.hypot(branca.vx,branca.vy);
-    dourada.vx=Math.cos(a)*v;
-    dourada.vy=Math.sin(a)*v;
-    branca.vx*=-0.3;
-    branca.vy*=-0.3;
-  }
-}
-
-/* ===== GAME ===== */
-function update(){
-  if(state==="PLAYING"){
-    time-=1/60;
-    tempoEl.innerText=time.toFixed(2);
-    if(time<=0)finish(false,"TEMPO ESGOTADO");
-  }
-
-  move(branca); move(dourada); collide();
-
-  if(Math.hypot(dourada.x-hole.x,dourada.y-hole.y)<hole.r){
-    finish(true);
-  }
-
-  if(state==="PLAYING"&&branca.vx===0&&dourada.vx===0){
-    finish(false,"ERROU");
-  }
-}
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="#000";
-  ctx.beginPath();ctx.arc(hole.x,hole.y,hole.r,0,Math.PI*2);ctx.fill();
-  [branca,dourada].forEach(b=>{
-    ctx.fillStyle=b.color;
-    ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
-  });
-}
-
-function finish(win,msg){
-  if(state!=="PLAYING")return;
-  state="RESULT";
-  if(win){
-    let gain=lockedBet*2;
-    saldo+=gain;
-    show(`GANHOU R$ ${gain.toFixed(2)}`,"gold");
-  }else{
-    show(msg||"PERDEU","#ff4444");
-  }
-  saldoEl.innerText=`R$ ${saldo.toFixed(2)}`;
-  setTimeout(reset,1500);
-}
-
-function reset(){
-  branca=ball(canvas.width*0.85,canvas.height*0.8,"#fff");
-  dourada=ball(canvas.width/2,canvas.height/2,"#ffd700");
-  time=3;
-  tempoEl.innerText="3.00";
-  lockedBet=0;
-  state="BETTING";
-}
-
-function show(t,c){
-  msgEl.innerText=t;
-  msgEl.style.color=c;
-  msgEl.style.display="block";
-  setTimeout(()=>msgEl.style.display="none",1500);
-}
-
-/* ===== TOUCH ===== */
-let start={x:0,y:0},power=0,angle=0,charging=false;
-
-canvas.addEventListener("touchstart",e=>{
-  if(state!=="PLAYING")return;
-  charging=true;
-  start={x:e.touches[0].clientX,y:e.touches[0].clientY};
+canvas.addEventListener('touchstart', (e) => {
+    // Só inicia se a bola estiver parada e tiver saldo
+    if(branca.vx === 0 && saldo >= valorAposta && valorAposta > 0 && !aguardandoParar) {
+        charging = true;
+        timerAtivo = true; // ATIVA O CRONÔMETRO NO TOQUE
+        
+        if(!apostaDebitada) {
+            saldo -= valorAposta;
+            saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+            apostaDebitada = true;
+        }
+        
+        dragStart = { x: e.touches.clientX, y: e.touches.clientY };
+    } else if (valorAposta <= 0) {
+        showMsg("ESCOLHA UMA BET!", "white");
+    }
 });
 
-canvas.addEventListener("touchmove",e=>{
-  if(!charging)return;
-  let dx=start.x-e.touches[0].clientX;
-  let dy=start.y-e.touches[0].clientY;
-  angle=Math.atan2(dy,dx);
-  power=Math.min(Math.hypot(dx,dy)/2,100);
+canvas.addEventListener('touchmove', (e) => {
+    if(!charging) return;
+    let dx = dragStart.x - e.touches.clientX;
+    let dy = dragStart.y - e.touches.clientY;
+    angle = Math.atan2(dy, dx);
+    power = Math.min(Math.hypot(dx, dy) / 2, 80);
 });
 
-canvas.addEventListener("touchend",()=>{
-  if(!charging)return;
-  charging=false;
-  branca.vx=Math.cos(angle)*(power/6);
-  branca.vy=Math.sin(angle)*(power/6);
+canvas.addEventListener('touchend', () => {
+    if(!charging) return;
+    charging = false;
+    if(power > 5) {
+        branca.vx = Math.cos(angle) * (power / 5);
+        branca.vy = Math.sin(angle) * (power / 5);
+        aguardandoParar = true;
+    }
 });
 
-/* ===== LOOP ===== */
-function loop(){
-  update(); draw(); requestAnimationFrame(loop);
-}
-loop();
-</script>
-</body>
-</html>
+draw();
