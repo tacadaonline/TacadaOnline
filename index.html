@@ -190,47 +190,54 @@ function update() {
         dourada.vy *= (1 - (dificuldadeRTP * 0.02));
     }
 
-// --- COLISÃO ENTRE BRANCA E DOURADA ---
+/* --- COLISÃO FÍSICA CORRIGIDA --- */
     let dx = dourada.x - branca.x;
     let dy = dourada.y - branca.y;
     let distancia = Math.hypot(dx, dy);
-    let raioMinimo = branca.r + dourada.r;
+    let raioSoma = branca.r + dourada.r;
 
-    if (distancia < raioMinimo) {
+    if (distancia < raioSoma) {
         tocar(somColisao);
-        
-        // 1. RESOLUÇÃO DE SOBREPOSIÇÃO (O Segredo para não bugar)
-        // Move as bolas para fora uma da outra imediatamente
-        let sobreposicao = raioMinimo - distancia;
+        if(navigator.vibrate) navigator.vibrate(20);
+
+        // 1. CORREÇÃO DE SOBREPOSIÇÃO (O SEGREDO)
+        // Isso empurra as bolas para fora uma da outra instantaneamente para não travarem
+        let overlap = raioSoma - distancia;
         let nx = dx / distancia; // Vetor normal X
         let ny = dy / distancia; // Vetor normal Y
         
-        // Afasta cada bola metade da distância necessária
-        branca.x -= nx * (sobreposicao / 2);
-        branca.y -= ny * (sobreposicao / 2);
-        dourada.x += nx * (sobreposicao / 2);
-        dourada.y += ny * (sobreposicao / 2);
+        branca.x -= nx * (overlap / 2);
+        branca.y -= ny * (overlap / 2);
+        dourada.x += nx * (overlap / 2);
+        dourada.y += ny * (overlap / 2);
 
-        // 2. TROCA DE VELOCIDADES (Física de Bilhar)
-        // Projeta a velocidade no vetor da colisão
-        let v1n = branca.vx * nx + branca.vy * ny;
-        let v2n = dourada.vx * nx + dourada.vy * ny;
+        // 2. CÁLCULO DE IMPULSO ELÁSTICO
+        // Encontra o ângulo da colisão
+        let anguloColisao = Math.atan2(dy, dx);
+        
+        // Velocidades escalares
+        let v1 = Math.hypot(branca.vx, branca.vy);
+        let v2 = Math.hypot(dourada.vx, dourada.vy);
 
-        // Inverte as velocidades na linha de impacto (conservação de momento simplificada)
-        let v1nDepois = v2n;
-        let v2nDepois = v1n;
+        // Direções atuais
+        let d1 = Math.atan2(branca.vy, branca.vx);
+        let d2 = Math.atan2(dourada.vy, dourada.vx);
 
-        // Aplica de volta às velocidades originais
-        branca.vx += (v1nDepois - v1n) * nx;
-        branca.vy += (v1nDepois - v1n) * ny;
-        dourada.vx += (v2nDepois - v2n) * nx;
-        dourada.vy += (v2nDepois - v2n) * ny;
-    }
+        // Novas velocidades baseadas na conservação de momento
+        let vx1Final = v1 * Math.cos(d1 - anguloColisao);
+        let vy1Final = v1 * Math.sin(d1 - anguloColisao);
+        let vx2Final = v2 * Math.cos(d2 - anguloColisao);
+        let vy2Final = v2 * Math.sin(d2 - anguloColisao);
 
-    // --- VERIFICAR SE CAIU NA CAÇAPA ---
-    let distDouradaHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
-    if (distDouradaHole < hole.r + 5) {
-        finish(true, "VOCÊ VENCEU!");
+        // Inverte os eixos X na colisão (Troca de energias)
+        let vx1Relativo = vx2Final;
+        let vx2Relativo = vx1Final;
+
+        // Aplica de volta ao mundo real (ajustado com 0.9 para perder um pouco de energia)
+        branca.vx = (Math.cos(anguloColisao) * vx1Relativo + Math.cos(anguloColisao + Math.PI/2) * vy1Final) * 0.9;
+        branca.vy = (Math.sin(anguloColisao) * vx1Relativo + Math.sin(anguloColisao + Math.PI/2) * vy1Final) * 0.9;
+        dourada.vx = (Math.cos(anguloColisao) * vx2Relativo + Math.cos(anguloColisao + Math.PI/2) * vy2Final) * 0.9;
+        dourada.vy = (Math.sin(anguloColisao) * vx2Relativo + Math.sin(anguloColisao + Math.PI/2) * vy2Final) * 0.9;
     }
 
     if (distHole < hole.r - 4) finish(true);
