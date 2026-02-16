@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold Pro - Selection Fix</title>
+    <title>Sinuca Gold Pro - Impacto Real</title>
     <style>
         body { background: #0a0a0a; color: gold; font-family: 'Arial', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; touch-action: none; }
         .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: #111; border-bottom: 2px solid #222; }
@@ -11,13 +11,8 @@
         .stat-value { font-size: 18px; font-weight: bold; color: #fff; }
         
         #bet-selector { margin: 10px 0; display: flex; gap: 5px; z-index: 20; align-items: center; }
-        .bet-btn, #custom-bet { 
-            background: #222; border: 1px solid #444; color: #aaa; 
-            padding: 8px 10px; border-radius: 4px; font-size: 12px; transition: 0.2s;
-        }
-        /* Classe de Seleção Ativa */
+        .bet-btn, #custom-bet { background: #222; border: 1px solid #444; color: #aaa; padding: 8px 10px; border-radius: 4px; font-size: 12px; transition: 0.2s; }
         .active-bet { border-color: gold !important; color: gold !important; background: #332b00 !important; box-shadow: 0 0 10px rgba(255,215,0,0.2); }
-        
         #custom-bet { width: 60px; color: #fff; text-align: center; outline: none; }
 
         canvas { background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); border: 6px solid #3e2723; border-radius: 12px; }
@@ -62,32 +57,27 @@
         const multiplicador = 2.0;
 
         let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
+        let animandoTaco = false, tacoAvanco = 0; // Nova lógica de animação
         let timeLeft = 3.00, timerAtivo = true, aguardandoParar = false;
         
         let branca = { x: canvas.width * 0.85, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
         let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
         const cacapa = { x: 25, y: 25, r: 16 };
 
-        // LÓGICA DE SELEÇÃO DE ABAS
         function selectBet(val, btn) {
-            if(aguardandoParar) return;
+            if(aguardandoParar || animandoTaco) return;
             valorAposta = val;
             resetSelection();
             btn.classList.add('active-bet');
-            customInput.value = ""; // Limpa o custom se clicar no fixo
+            customInput.value = "";
             atualizarLucro();
         }
 
         function selectCustom() {
-            if(aguardandoParar) return;
+            if(aguardandoParar || animandoTaco) return;
             resetSelection();
             customInput.classList.add('active-bet');
             updateCustomValue(customInput.value);
-        }
-
-        function updateCustomValue(val) {
-            valorAposta = parseFloat(val) || 0;
-            atualizarLucro();
         }
 
         function resetSelection() {
@@ -104,15 +94,17 @@
             ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
 
-            if(charging) {
-                let distTaco = 20 + power;
+            // DESENHO DO TACO COM ANIMAÇÃO DE IMPACTO
+            if(charging || animandoTaco) {
+                let distTaco = charging ? (20 + power) : (20 + power - tacoAvanco);
                 let tacoX = branca.x - Math.cos(angle) * distTaco;
                 let tacoY = branca.y - Math.sin(angle) * distTaco;
+                
                 ctx.save();
                 ctx.translate(tacoX, tacoY);
                 ctx.rotate(angle);
-                ctx.fillStyle = '#4e342e'; ctx.fillRect(-150, -3, 150, 6);
-                ctx.fillStyle = '#fff'; ctx.fillRect(0, -3, 5, 6);
+                ctx.fillStyle = '#4e342e'; ctx.fillRect(-150, -3, 150, 6); // Madeira
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, -3, 5, 6); // Ponta
                 ctx.restore();
             }
 
@@ -126,11 +118,20 @@
         }
 
         function update() {
-            if(timerAtivo && !aguardandoParar) {
+            if(timerAtivo && !aguardandoParar && !animandoTaco) {
                 timeLeft -= 1/60;
                 document.getElementById('timer-text').innerText = Math.max(0, timeLeft).toFixed(2);
                 timerFill.style.width = (timeLeft / 3 * 100) + "%";
                 if(timeLeft <= 0) { timerAtivo = false; finalizarRodada(false, "TEMPO ESGOTADO!"); }
+            }
+
+            // Animação do Taco batendo na bola
+            if(animandoTaco) {
+                tacoAvanco += 15; // Velocidade do avanço do taco
+                if(tacoAvanco >= (20 + power)) {
+                    animandoTaco = false;
+                    realizarTacada(); // Só move a bola após o impacto
+                }
             }
 
             [branca, dourada].forEach(b => {
@@ -153,6 +154,16 @@
 
             if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < 20) finalizarRodada(true);
             if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) finalizarRodada(false);
+        }
+
+        function realizarTacada() {
+            saldo -= valorAposta;
+            saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+            branca.vx = Math.cos(angle) * (power / 5);
+            branca.vy = Math.sin(angle) * (power / 5);
+            aguardandoParar = true;
+            tacoAvanco = 0;
+            power = 0;
         }
 
         function finalizarRodada(acertou, msg) {
@@ -184,7 +195,7 @@
         }
 
         canvas.addEventListener('touchstart', (e) => {
-            if(branca.vx === 0 && saldo >= valorAposta && valorAposta > 0) {
+            if(branca.vx === 0 && !animandoTaco && saldo >= valorAposta && valorAposta > 0) {
                 charging = true;
                 dragStart = { x: e.touches.clientX, y: e.touches.clientY };
             } else if (valorAposta <= 0) {
@@ -204,11 +215,7 @@
             if(!charging) return;
             charging = false;
             if(power > 5) {
-                saldo -= valorAposta;
-                saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
-                branca.vx = Math.cos(angle) * (power / 5);
-                branca.vy = Math.sin(angle) * (power / 5);
-                aguardandoParar = true;
+                animandoTaco = true; // Inicia o avanço do taco primeiro
             }
         });
 
