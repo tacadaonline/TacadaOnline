@@ -186,8 +186,8 @@ function update() {
         let desvioLateral = Math.PI / 2; 
         dourada.vx += Math.cos(aD + desvioLateral) * (dificuldadeRTP * 0.08);
         dourada.vy += Math.sin(aD + desvioLateral) * (dificuldadeRTP * 0.08);
-        dourada.vx *= (1 - (dificuldadeRTP * 0.02)); 
-        dourada.vy *= (1 - (dificuldadeRTP * 0.02));
+        dourada.vx *= (1 - (dificuldadeRTP * 0.05)); 
+        dourada.vy *= (1 - (dificuldadeRTP * 0.05));
     }
 
     let dx = dourada.x - branca.x;
