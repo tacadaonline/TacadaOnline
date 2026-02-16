@@ -1,268 +1,264 @@
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinuca Gold</title>
 
-const timerFill = document.getElementById('timer-fill');
-const saldoDisplay = document.getElementById('saldo-display');
-const lucroPrevisto = document.getElementById('lucro-previsto');
-const customInput = document.getElementById('custom-bet');
-const timerText = document.getElementById('timer-text');
-const msgBox = document.getElementById('msg-status');
+<style>
+body{
+    margin:0;
+    background:#0a0a0a;
+    color:gold;
+    font-family:Arial, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    overflow:hidden;
+}
+
+.header{
+    width:100%;
+    padding:10px;
+    display:flex;
+    justify-content:space-around;
+    background:#111;
+    border-bottom:2px solid #222;
+}
+
+.stat-box{text-align:center}
+.stat-value{font-weight:bold;color:#fff}
+
+canvas{
+    margin-top:10px;
+    background:radial-gradient(circle,#0b5e28 0%,#053a18 100%);
+    border:6px solid #3e2723;
+    border-radius:12px;
+}
+
+#msg{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:28px;
+    font-weight:bold;
+    display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<div class="stat-box">SALDO<br><span id="saldo" class="stat-value">R$ 1000.00</span></div>
+<div class="stat-box">RETORNO (2x)<br><span id="retorno" class="stat-value" style="color:#0f0">R$ 20.00</span></div>
+<div class="stat-box">TEMPO<br><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
+</div>
+
+<canvas id="game"></canvas>
+<div id="msg"></div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.8;
 
-/* ================== CONFIG ================== */
+const saldoEl = document.getElementById("saldo");
+const retornoEl = document.getElementById("retorno");
+const tempoEl = document.getElementById("tempo");
+const msgEl = document.getElementById("msg");
 
 let saldo = 1000;
-let valorAposta = 10;
-const multiplicador = 2;
+let aposta = 10;
+let multiplicador = 2;
 
-let gameState = "ready"; // ready | playing | result
+let estado = "pronto"; // pronto | jogando | resultado
+let tempo = 3;
 
-let timeLeft = 3;
-let charging = false;
-let power = 0;
-let angle = 0;
-let dragStart = { x: 0, y: 0 };
+let charging=false;
+let power=0;
+let angle=0;
+let dragStart={x:0,y:0};
 
-const friction = 0.99;
-const minSpeed = 0.05;
+const friccao=0.99;
+const minVel=0.05;
 
-/* ================== OBJETOS ================== */
-
-function createBall(x, y, color) {
-    return { x, y, vx: 0, vy: 0, r: 9, color };
+function bola(x,y,color){
+    return {x,y,vx:0,vy:0,r:9,color};
 }
 
-let branca = createBall(canvas.width * 0.85, canvas.height * 0.8, "#fff");
-let dourada = createBall(canvas.width / 2, canvas.height / 2, "#ffd700");
+let branca = bola(canvas.width*0.85, canvas.height*0.8, "#fff");
+let dourada = bola(canvas.width/2, canvas.height/2, "#ffd700");
+const cacapa = {x:30,y:30,r:18};
 
-const cacapa = { x: 30, y: 30, r: 18 };
+retornoEl.innerText="R$ "+(aposta*multiplicador).toFixed(2);
 
-/* ================== BET ================== */
+/* ================= FÍSICA ================= */
 
-function atualizarLucro() {
-    lucroPrevisto.innerText = `R$ ${(valorAposta * multiplicador).toFixed(2)}`;
+function atualizarBola(b){
+    b.x+=b.vx;
+    b.y+=b.vy;
+    b.vx*=friccao;
+    b.vy*=friccao;
+
+    if(Math.abs(b.vx)<minVel) b.vx=0;
+    if(Math.abs(b.vy)<minVel) b.vy=0;
+
+    if(b.x-b.r<0 || b.x+b.r>canvas.width) b.vx*=-0.8;
+    if(b.y-b.r<0 || b.y+b.r>canvas.height) b.vy*=-0.8;
 }
 
-function selectBet(val, btn) {
-    if (gameState !== "ready") return;
-    valorAposta = val;
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    btn.classList.add('active-bet');
-    customInput.value = "";
-    atualizarLucro();
-}
+function colisao(b1,b2){
+    let dx=b2.x-b1.x;
+    let dy=b2.y-b1.y;
+    let dist=Math.hypot(dx,dy);
 
-function selectCustom() {
-    if (gameState !== "ready") return;
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    customInput.classList.add('active-bet');
-}
+    if(dist<b1.r+b2.r){
+        let ang=Math.atan2(dy,dx);
+        let vel=Math.hypot(b1.vx,b1.vy);
 
-function updateCustomValue(val) {
-    valorAposta = parseFloat(val) || 0;
-    atualizarLucro();
-}
+        b2.vx=Math.cos(ang)*vel;
+        b2.vy=Math.sin(ang)*vel;
 
-/* ================== FÍSICA ================== */
-
-function resolveCollision(b1, b2) {
-    let dx = b2.x - b1.x;
-    let dy = b2.y - b1.y;
-    let dist = Math.hypot(dx, dy);
-
-    if (dist < b1.r + b2.r) {
-
-        let angle = Math.atan2(dy, dx);
-        let sin = Math.sin(angle);
-        let cos = Math.cos(angle);
-
-        let v1 = rotate(b1.vx, b1.vy, sin, cos, true);
-        let v2 = rotate(b2.vx, b2.vy, sin, cos, true);
-
-        let temp = v1.x;
-        v1.x = v2.x;
-        v2.x = temp;
-
-        let final1 = rotate(v1.x, v1.y, sin, cos, false);
-        let final2 = rotate(v2.x, v2.y, sin, cos, false);
-
-        b1.vx = final1.x * 0.98;
-        b1.vy = final1.y * 0.98;
-        b2.vx = final2.x * 0.98;
-        b2.vy = final2.y * 0.98;
+        b1.vx*=-0.3;
+        b1.vy*=-0.3;
     }
 }
 
-function rotate(vx, vy, sin, cos, reverse) {
-    return {
-        x: reverse ? vx * cos + vy * sin : vx * cos - vy * sin,
-        y: reverse ? vy * cos - vx * sin : vy * cos + vx * sin
-    };
-}
+/* ================= GAME ================= */
 
-/* ================== UPDATE ================== */
+function update(){
 
-function updateBall(ball) {
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-
-    ball.vx *= friction;
-    ball.vy *= friction;
-
-    if (Math.abs(ball.vx) < minSpeed) ball.vx = 0;
-    if (Math.abs(ball.vy) < minSpeed) ball.vy = 0;
-
-    if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width)
-        ball.vx *= -0.8;
-
-    if (ball.y - ball.r < 0 || ball.y + ball.r > canvas.height)
-        ball.vy *= -0.8;
-}
-
-/* ================== GAME LOOP ================== */
-
-function update() {
-
-    if (gameState === "playing") {
-        timeLeft -= 1 / 60;
-        timerText.innerText = Math.max(0, timeLeft).toFixed(2);
-        timerFill.style.width = (timeLeft / 3 * 100) + "%";
-
-        if (timeLeft <= 0) {
-            endRound(false, "TEMPO ESGOTADO!");
-        }
+    if(estado==="jogando"){
+        tempo-=1/60;
+        tempoEl.innerText=tempo.toFixed(2);
+        if(tempo<=0) fim(false,"TEMPO ESGOTADO");
     }
 
-    updateBall(branca);
-    updateBall(dourada);
-    resolveCollision(branca, dourada);
+    atualizarBola(branca);
+    atualizarBola(dourada);
+    colisao(branca,dourada);
 
-    // Vitória
-    if (Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < cacapa.r) {
-        endRound(true);
+    if(Math.hypot(dourada.x-cacapa.x,dourada.y-cacapa.y)<cacapa.r){
+        fim(true);
     }
 
-    // Se tudo parou e ainda está jogando = perdeu
-    if (gameState === "playing" &&
-        branca.vx === 0 && branca.vy === 0 &&
-        dourada.vx === 0 && dourada.vy === 0) {
-        endRound(false, "ERROU!");
+    if(estado==="jogando" &&
+       branca.vx===0 && branca.vy===0 &&
+       dourada.vx===0 && dourada.vy===0){
+        fim(false,"ERROU");
     }
 }
 
-/* ================== DRAW ================== */
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#000";
+    ctx.fillStyle="#000";
     ctx.beginPath();
-    ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI * 2);
+    ctx.arc(cacapa.x,cacapa.y,cacapa.r,0,Math.PI*2);
     ctx.fill();
 
-    if (charging) {
+    if(charging){
         ctx.beginPath();
-        ctx.moveTo(branca.x, branca.y);
+        ctx.moveTo(branca.x,branca.y);
         ctx.lineTo(
-            branca.x + Math.cos(angle) * power,
-            branca.y + Math.sin(angle) * power
+            branca.x+Math.cos(angle)*power,
+            branca.y+Math.sin(angle)*power
         );
-        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.strokeStyle="rgba(255,255,255,0.3)";
         ctx.stroke();
     }
 
-    [branca, dourada].forEach(b => {
-        ctx.fillStyle = b.color;
+    [branca,dourada].forEach(b=>{
+        ctx.fillStyle=b.color;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
         ctx.fill();
     });
 }
 
-/* ================== ROUND ================== */
+function fim(vitoria,msg){
+    if(estado!=="jogando") return;
+    estado="resultado";
 
-function endRound(win, msg) {
-    if (gameState !== "playing") return;
-
-    gameState = "result";
-
-    if (win) {
-        let ganho = valorAposta * multiplicador;
-        saldo += ganho;
-        showMsg(`GANHOU R$ ${ganho.toFixed(2)}!`, "gold");
-    } else {
-        showMsg(msg || "PERDEU!", "#ff4444");
+    if(vitoria){
+        let ganho=aposta*multiplicador;
+        saldo+=ganho;
+        mostrar("GANHOU R$ "+ganho.toFixed(2),"gold");
+    }else{
+        mostrar(msg||"PERDEU","#ff4444");
     }
 
-    saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+    saldoEl.innerText="R$ "+saldo.toFixed(2);
 
-    setTimeout(resetGame, 1500);
+    setTimeout(reset,1500);
 }
 
-function resetGame() {
-    branca = createBall(canvas.width * 0.85, canvas.height * 0.8, "#fff");
-    dourada = createBall(canvas.width / 2, canvas.height / 2, "#ffd700");
-    timeLeft = 3;
-    gameState = "ready";
-    timerFill.style.width = "100%";
-    timerText.innerText = "3.00";
+function mostrar(t,c){
+    msgEl.innerText=t;
+    msgEl.style.color=c;
+    msgEl.style.display="block";
+    setTimeout(()=>msgEl.style.display="none",1500);
 }
 
-function showMsg(text, color) {
-    msgBox.innerText = text;
-    msgBox.style.color = color;
-    msgBox.style.display = "block";
-    setTimeout(() => msgBox.style.display = "none", 1500);
+function reset(){
+    branca = bola(canvas.width*0.85, canvas.height*0.8, "#fff");
+    dourada = bola(canvas.width/2, canvas.height/2, "#ffd700");
+    tempo=3;
+    tempoEl.innerText="3.00";
+    estado="pronto";
 }
 
-/* ================== TOUCH ================== */
+/* ================= TOUCH ================= */
 
-canvas.addEventListener("touchstart", e => {
-    if (gameState !== "ready") return;
-    if (saldo < valorAposta || valorAposta <= 0) return;
+canvas.addEventListener("touchstart",e=>{
+    if(estado!=="pronto") return;
+    if(saldo<aposta) return;
 
-    const touch = e.touches[0];
-    charging = true;
-    dragStart = { x: touch.clientX, y: touch.clientY };
+    const t=e.touches[0];
+    charging=true;
+    dragStart={x:t.clientX,y:t.clientY};
 });
 
-canvas.addEventListener("touchmove", e => {
-    if (!charging) return;
+canvas.addEventListener("touchmove",e=>{
+    if(!charging) return;
 
-    const touch = e.touches[0];
-    let dx = dragStart.x - touch.clientX;
-    let dy = dragStart.y - touch.clientY;
+    const t=e.touches[0];
+    let dx=dragStart.x-t.clientX;
+    let dy=dragStart.y-t.clientY;
 
-    angle = Math.atan2(dy, dx);
-    power = Math.min(Math.hypot(dx, dy) / 2, 100);
+    angle=Math.atan2(dy,dx);
+    power=Math.min(Math.hypot(dx,dy)/2,100);
 });
 
-canvas.addEventListener("touchend", () => {
-    if (!charging) return;
-    charging = false;
+canvas.addEventListener("touchend",()=>{
+    if(!charging) return;
+    charging=false;
 
-    if (power > 5) {
-        saldo -= valorAposta;
-        saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
+    if(power>5){
+        saldo-=aposta;
+        saldoEl.innerText="R$ "+saldo.toFixed(2);
 
-        branca.vx = Math.cos(angle) * (power / 6);
-        branca.vy = Math.sin(angle) * (power / 6);
+        branca.vx=Math.cos(angle)*(power/6);
+        branca.vy=Math.sin(angle)*(power/6);
 
-        gameState = "playing";
+        estado="jogando";
     }
 });
 
-/* ================== LOOP ================== */
+/* ================= LOOP ================= */
 
-function loop() {
+function loop(){
     update();
     draw();
     requestAnimationFrame(loop);
 }
 
 loop();
-atualizarLucro();
+
 </script>
+</body>
+</html>
