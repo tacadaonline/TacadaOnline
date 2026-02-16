@@ -79,7 +79,7 @@ let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#ffd700" };
 let hole = { x: 0, y: 0, r: 11 };
 
 function sortearPosicoes() {
-    const m = 11;
+    const m = 9;
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x;
