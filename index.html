@@ -24,23 +24,11 @@ header{
     text-shadow:0 0 10px gold;
 }
 
-#saldo{font-size:26px;}
-#apostaBox{
-    margin-top:8px;
-    font-size:16px;
-}
-input{
-    width:80px;
-    text-align:center;
-    font-size:16px;
-}
-
 canvas{
     background: linear-gradient(135deg,#0b5e28,#043314);
     border:10px solid #3e2723;
     border-radius:20px;
     margin-top:15px;
-    box-shadow:0 0 30px rgba(0,0,0,.8);
 }
 
 #forca{
@@ -62,7 +50,7 @@ canvas{
     position:absolute;
     top:50%;
     transform:translateY(-50%);
-    font-size:48px;
+    font-size:42px;
     display:none;
     text-shadow:0 0 20px gold;
 }
@@ -72,20 +60,17 @@ canvas{
 <body>
 
 <header>
-    <div>Saldo: R$ <span id="saldo">100.00</span></div>
-    <div id="apostaBox">
-        Aposta: R$ <input id="aposta" type="number" value="10" min="1">
-    </div>
+Saldo: R$ <span id="saldo">100.00</span><br>
+Aposta: R$ <input id="aposta" type="number" value="10" min="1">
 </header>
 
 <canvas id="game"></canvas>
 
 <div id="forca"><div id="forcaFill"></div></div>
 
-<div id="msg">GANHOU 💰</div>
+<div id="msg"></div>
 
 <script>
-/* ========= CONFIG ========= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.9;
@@ -94,31 +79,41 @@ canvas.height = canvas.width * 0.55;
 let saldo = 100;
 let charging = false;
 let power = 0;
+let jogando = false;
 
-/* ========= SONS ========= */
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-function playSound(freq, time){
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + time);
-    osc.start();
-    osc.stop(audioCtx.currentTime + time);
+function play(freq,time){
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value=freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.2,audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+time);
+    o.start(); o.stop(audioCtx.currentTime+time);
 }
 
-/* ========= BOLAS ========= */
-// Bola branca (taco)
-const white = { x: canvas.width*0.25, y: canvas.height/2, vx:0, vy:0, r:12 };
+const whiteStartX = canvas.width*0.25;
+const whiteStartY = canvas.height/2;
 
-// Bolão (alvo)
-const big = { x: canvas.width*0.7, y: canvas.height/2, vx:0, vy:0, r:20 };
+const bigStartX = canvas.width*0.7;
+const bigStartY = canvas.height/2;
 
-// Caçapa
-const pocket = { x: canvas.width*0.9, y: canvas.height/2, r:26 };
+const white = {x:whiteStartX,y:whiteStartY,vx:0,vy:0,r:12};
+const big = {x:bigStartX,y:bigStartY,vx:0,vy:0,r:20};
+const pocket = {x:canvas.width*0.9,y:canvas.height/2,r:26};
+
+function resetGame(){
+    white.x=whiteStartX;
+    white.y=whiteStartY;
+    white.vx=white.vy=0;
+
+    big.x=bigStartX;
+    big.y=bigStartY;
+    big.vx=big.vy=0;
+
+    jogando=false;
+}
 
 function drawBall(b,color){
     ctx.fillStyle=color;
@@ -128,33 +123,55 @@ function drawBall(b,color){
 }
 
 function physics(b){
-    b.x += b.vx;
-    b.y += b.vy;
-    b.vx *= 0.97;
-    b.vy *= 0.97;
+    b.x+=b.vx;
+    b.y+=b.vy;
+    b.vx*=0.97;
+    b.vy*=0.97;
+
+    // REBOTE NAS BORDAS
+    if(b.x-b.r<=0 || b.x+b.r>=canvas.width){
+        b.vx*=-1;
+    }
+    if(b.y-b.r<=0 || b.y+b.r>=canvas.height){
+        b.vy*=-1;
+    }
 }
 
 function collide(a,b){
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const dist = Math.hypot(dx,dy);
-    if(dist < a.r + b.r){
-        const angle = Math.atan2(dy,dx);
-        const speed = Math.hypot(a.vx,a.vy);
+    const dx=b.x-a.x;
+    const dy=b.y-a.y;
+    const dist=Math.hypot(dx,dy);
 
-        b.vx = Math.cos(angle)*speed;
-        b.vy = Math.sin(angle)*speed;
-        a.vx *= 0.3;
-        a.vy *= 0.3;
+    if(dist<a.r+b.r){
+        const ang=Math.atan2(dy,dx);
+        const speed=Math.hypot(a.vx,a.vy);
 
-        playSound(200,0.08); // som colisão
+        b.vx=Math.cos(ang)*speed;
+        b.vy=Math.sin(ang)*speed;
+
+        a.vx*=0.3;
+        a.vy*=0.3;
+
+        play(200,0.08);
+    }
+}
+
+function showMsg(text){
+    const msg=document.getElementById("msg");
+    msg.innerText=text;
+    msg.style.display="block";
+    setTimeout(()=>msg.style.display="none",1200);
+}
+
+function checkEnd(){
+    if(Math.abs(white.vx)<0.05 && Math.abs(big.vx)<0.05 && jogando){
+        setTimeout(resetGame,800);
     }
 }
 
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Caçapa
     ctx.fillStyle="#000";
     ctx.beginPath();
     ctx.arc(pocket.x,pocket.y,pocket.r,0,Math.PI*2);
@@ -167,59 +184,53 @@ function draw(){
     physics(big);
     collide(white,big);
 
-    // Vitória (bolão na caçapa)
-    if(Math.hypot(big.x-pocket.x,big.y-pocket.y) < pocket.r){
-        const aposta = Number(document.getElementById("aposta").value);
-        saldo += aposta * 2;
-        document.getElementById("saldo").innerText = saldo.toFixed(2);
-
-        playSound(800,0.2);
-        document.getElementById("msg").style.display="block";
-
-        setTimeout(()=>document.getElementById("msg").style.display="none",1500);
-
-        big.x = canvas.width*0.7;
-        big.y = canvas.height/2;
-        big.vx = big.vy = 0;
+    // SE BOLÃO CAIR
+    if(Math.hypot(big.x-pocket.x,big.y-pocket.y)<pocket.r){
+        const aposta=Number(document.getElementById("aposta").value);
+        saldo+=aposta*2;
+        document.getElementById("saldo").innerText=saldo.toFixed(2);
+        play(800,0.2);
+        showMsg("GANHOU 💰");
+        setTimeout(resetGame,800);
     }
 
+    checkEnd();
     requestAnimationFrame(draw);
 }
 
-/* ========= CONTROLES ========= */
-canvas.addEventListener("touchstart", ()=>{
-    if(Math.abs(white.vx)<0.1){
+canvas.addEventListener("touchstart",()=>{
+    if(!jogando){
         charging=true;
         power=0;
     }
 });
 
-canvas.addEventListener("touchend", ()=>{
+canvas.addEventListener("touchend",()=>{
     if(!charging) return;
     charging=false;
 
-    const aposta = Number(document.getElementById("aposta").value);
-    if(saldo < aposta) return;
+    const aposta=Number(document.getElementById("aposta").value);
+    if(saldo<aposta) return;
 
-    saldo -= aposta;
-    document.getElementById("saldo").innerText = saldo.toFixed(2);
+    saldo-=aposta;
+    document.getElementById("saldo").innerText=saldo.toFixed(2);
 
-    white.vx = power/4;
-    white.vy = (Math.random()-0.5)*2;
+    white.vx=power/4;
+    white.vy=(Math.random()-0.5)*2;
     document.getElementById("forcaFill").style.width="0%";
 
-    playSound(120,0.1); // som tacada
+    jogando=true;
+    play(120,0.1);
 });
 
 setInterval(()=>{
     if(charging){
-        power = Math.min(power+2,100);
+        power=Math.min(power+2,100);
         document.getElementById("forcaFill").style.width=power+"%";
     }
 },30);
 
 draw();
 </script>
-
 </body>
 </html>
