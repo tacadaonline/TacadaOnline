@@ -3,62 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold - Bet System</title>
+    <title>Sinuca Gold - High Stakes</title>
     <style>
-        body { 
-            background: #0f0f0f; color: gold; font-family: 'Arial', sans-serif; 
-            margin: 0; overflow: hidden; display: flex; flex-direction: column; 
-            align-items: center; height: 100vh; touch-action: none;
-        }
+        body { background: #0f0f0f; color: gold; font-family: 'Arial', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; touch-action: none; }
         .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: #1a1a1a; border-bottom: 2px solid #333; }
         .stat-box { text-align: center; }
-        .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
         .stat-value { font-size: 20px; font-weight: bold; display: block; }
         
-        #controls { margin-top: 10px; display: flex; gap: 10px; z-index: 20; }
-        .bet-btn { 
-            background: #222; border: 1px solid gold; color: gold; padding: 5px 15px; 
-            border-radius: 5px; cursor: pointer; transition: 0.3s;
-        }
-        .bet-btn.active { background: gold; color: #000; font-weight: bold; }
-
-        canvas { 
-            background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); 
-            border: 5px solid #3e2723; border-radius: 10px; margin-top: 10px;
+        /* Painel de Apostas */
+        #bet-panel { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; z-index: 20; padding: 0 10px; }
+        .bet-btn { background: #222; border: 1px solid gold; color: gold; padding: 8px 12px; border-radius: 5px; font-weight: bold; }
+        .bet-btn.active { background: gold; color: #000; }
+        
+        #custom-bet-input { 
+            width: 80px; background: #000; border: 1px solid gold; color: #fff; 
+            padding: 7px; border-radius: 5px; text-align: center; font-weight: bold;
         }
 
-        #timer-bar { width: 92%; height: 5px; background: #333; margin-top: 5px; border-radius: 5px; }
-        #timer-fill { width: 100%; height: 100%; background: #ff4444; transition: width 0.1s linear; }
-
-        #msg-status {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 30px; font-weight: bold; display: none; z-index: 100; text-align: center;
-            padding: 20px; border-radius: 15px; background: rgba(0,0,0,0.8);
-        }
+        canvas { background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); border: 5px solid #3e2723; border-radius: 10px; margin-top: 10px; }
+        #timer-bar { width: 92%; height: 6px; background: #333; margin-top: 5px; border-radius: 5px; overflow: hidden;}
+        #timer-fill { width: 100%; height: 100%; background: #ff0000; }
+        #msg-status { position: absolute; top: 55%; font-size: 28px; font-weight: bold; display: none; z-index: 100; text-align: center; width: 100%; text-shadow: 0 0 10px #000; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div class="stat-box">
-            <span class="stat-label">Saldo Atual</span>
-            <span class="stat-value" id="saldo-display">R$ 100.00</span>
-        </div>
-        <div class="stat-box">
-            <span class="stat-label">Tempo</span>
-            <span class="stat-value" id="timer-text" style="color: #ff4444;">03.00</span>
-        </div>
+        <div class="stat-box"><span>SALDO</span><span id="saldo-display" class="stat-value">R$ 1000.00</span></div>
+        <div class="stat-box"><span>TEMPO</span><span id="timer-text" class="stat-value" style="color: #ff4444;">03.00</span></div>
     </div>
 
-    <div id="controls">
-        <button class="bet-btn active" onclick="setBet(10)">Bet R$10</button>
-        <button class="bet-btn" onclick="setBet(20)">Bet R$20</button>
-        <button class="bet-btn" onclick="setBet(50)">Bet R$50</button>
+    <div id="bet-panel">
+        <button class="bet-btn active" onclick="setBet(10, this)">R$ 10</button>
+        <button class="bet-btn" onclick="setBet(20, this)">R$ 20</button>
+        <button class="bet-btn" onclick="setBet(50, this)">R$ 50</button>
+        <input type="number" id="custom-bet-input" placeholder="OUTRO" oninput="updateCustomBet(this.value)">
     </div>
 
     <canvas id="gameCanvas"></canvas>
     <div id="timer-bar"><div id="timer-fill"></div></div>
-
     <div id="msg-status"></div>
 
     <script>
@@ -69,48 +52,49 @@
         const saldoDisplay = document.getElementById('saldo-display');
         const msgStatus = document.getElementById('msg-status');
 
-        canvas.width = window.innerWidth * 0.92;
-        canvas.height = canvas.width * 0.7;
+        canvas.width = window.innerWidth * 0.94;
+        canvas.height = canvas.width * 0.75;
 
-        // LÓGICA FINANCEIRA
-        let saldo = 100.00;
+        // LÓGICA DE DINHEIRO
+        let saldo = 1000.00;
         let valorAposta = 10;
-        let multiplicadorPremio = 5; // Ex: Aposta 10, ganha 10
-        let totalDepositado = 100.00; 
-        let totalGanho = 0;
+        let multiplicador = 2; // Ganha o que apostou (Aposta 10 -> Retorna 20)
 
-        // Física e Jogo
         let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
-        let timeLeft = 7.00, timerAtivo = true, aguardandoParar = false;
+        let timeLeft = 3.00, timerAtivo = true, aguardandoParar = false;
         
-        let branca = { x: canvas.width * 0.8, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
+        let branca = { x: canvas.width * 0.85, y: canvas.height * 0.8, vx: 0, vy: 0, r: 8, color: '#fff' };
         let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
         const cacapa = { x: 25, y: 25, r: 14 };
 
-        function setBet(val) {
+        function setBet(val, btn) {
             if(aguardandoParar) return;
-            valorAposta = val;
+            valorAposta = parseFloat(val);
             document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
+            if(btn) btn.classList.add('active');
+            document.getElementById('custom-bet-input').value = "";
+        }
+
+        function updateCustomBet(val) {
+            if(val > 0) {
+                valorAposta = parseFloat(val);
+                document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active'));
+            }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Caçapa
             ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
 
-            // Mira
             if(charging) {
                 ctx.beginPath();
                 ctx.moveTo(branca.x, branca.y);
-                ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-                ctx.stroke();
+                ctx.lineTo(branca.x + Math.cos(angle) * 60, branca.y + Math.sin(angle) * 60);
+                ctx.strokeStyle = "rgba(255,255,255,0.4)";
+                ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Desenhar Bolas
             [branca, dourada].forEach(b => {
                 ctx.fillStyle = b.color;
                 ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
@@ -136,10 +120,9 @@
                 if(b.y + b.r > canvas.height || b.y - b.r < 0) b.vy *= -0.7;
             });
 
-            // Colisão
             let dx = dourada.x - branca.x;
             let dy = dourada.y - branca.y;
-            if(Math.hypot(dx, dy) < branca.r + dourada.r) {
+            if(Math.hypot(dx, dy) < 16) {
                 let colAngle = Math.atan2(dy, dx);
                 let speed = Math.hypot(branca.vx, branca.vy);
                 dourada.vx = Math.cos(colAngle) * speed * 0.9;
@@ -147,8 +130,7 @@
                 branca.vx *= -0.2; branca.vy *= -0.2;
             }
 
-            // Vitória
-            if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < cacapa.r) {
+            if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < 14) {
                 finalizarRodada(true);
             }
 
@@ -157,20 +139,17 @@
             }
         }
 
-        function finalizarRodada(acertou, msgPersonalizada = "") {
-            if(!aguardandoParar && !acertou && msgPersonalizada === "") return;
-            aguardandoParar = false;
-            timerAtivo = false;
+        function finalizarRodada(acertou, msgErr = "") {
+            if(!aguardandoParar && !acertou && msgErr === "") return;
+            aguardandoParar = false; timerAtivo = false;
 
             if(acertou) {
-                let ganho = valorAposta * multiplicadorPremio;
-                saldo += ganho;
-                totalGanho += ganho;
-                exibirMensagem(`GANHOU R$ ${ganho.toFixed(2)}!`, "gold");
+                let premioTotal = valorAposta * multiplicador; 
+                saldo += premioTotal; // Adiciona a aposta de volta + o lucro
+                exibirMensagem(`VOCÊ GANHOU R$ ${valorAposta.toFixed(2)}!`, "gold");
             } else {
-                let msg = msgPersonalizada || "ERROU!";
-                if(msgPersonalizada !== "") saldo -= (valorAposta / 2); // Penalidade tempo
-                exibirMensagem(msg, "#ff4444");
+                exibirMensagem(msgErr || "VOCÊ ERROU!", "#ff4444");
+                if(msgErr !== "") saldo -= (valorAposta * 0.2); // Taxa por estourar o tempo
             }
 
             saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
@@ -179,32 +158,28 @@
 
         function resetPosicoes() {
             branca.vx = 0; branca.vy = 0;
-            branca.x = canvas.width * 0.8; branca.y = canvas.height * 0.8;
+            branca.x = canvas.width * 0.85; branca.y = canvas.height * 0.8;
             dourada.vx = 0; dourada.vy = 0;
             dourada.x = canvas.width / 2; dourada.y = canvas.height / 2;
-            timeLeft = 3.00;
-            timerAtivo = true;
-            aguardandoParar = false;
+            timeLeft = 3.00; timerAtivo = true; aguardandoParar = false;
         }
 
-        function exibirMensagem(texto, cor) {
-            msgStatus.innerText = texto; msgStatus.style.color = cor;
+        function exibirMensagem(t, c) {
+            msgStatus.innerText = t; msgStatus.style.color = c;
             msgStatus.style.display = 'block';
-            setTimeout(() => { msgStatus.style.display = 'none'; }, 1500);
+            setTimeout(() => msgStatus.style.display = 'none', 1500);
         }
 
         canvas.addEventListener('touchstart', (e) => {
             if(branca.vx === 0 && timerAtivo && saldo >= valorAposta) {
-                charging = true; dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            } else if (saldo < valorAposta) {
-                exibirMensagem("SALDO INSUFICIENTE", "red");
+                charging = true; dragStart = { x: e.touches.clientX, y: e.touches.clientY };
             }
         });
 
         canvas.addEventListener('touchmove', (e) => {
             if(!charging) return;
-            let dx = dragStart.x - e.touches[0].clientX;
-            let dy = dragStart.y - e.touches[0].clientY;
+            let dx = dragStart.x - e.touches.clientX;
+            let dy = dragStart.y - e.touches.clientY;
             angle = Math.atan2(dy, dx);
             power = Math.min(Math.hypot(dx, dy) / 2, 100);
         });
