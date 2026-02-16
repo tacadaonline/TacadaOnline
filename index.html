@@ -3,38 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sinuca Gold Pro - Physics & Math</title>
+    <title>Sinuca Gold Pro - Selection Fix</title>
     <style>
         body { background: #0a0a0a; color: gold; font-family: 'Arial', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; touch-action: none; }
         .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: #111; border-bottom: 2px solid #222; }
         .stat-box { text-align: center; }
         .stat-value { font-size: 18px; font-weight: bold; color: #fff; }
         
-        #bet-selector { margin: 10px 0; display: flex; gap: 5px; z-index: 20; }
-        .bet-btn { background: #222; border: 1px solid #444; color: #aaa; padding: 8px 12px; border-radius: 4px; font-size: 12px; }
-        .bet-btn.active { border-color: gold; color: gold; background: #332b00; }
-        #custom-bet { width: 70px; background: #000; border: 1px solid #444; color: #fff; border-radius: 4px; padding: 7px; text-align: center; }
+        #bet-selector { margin: 10px 0; display: flex; gap: 5px; z-index: 20; align-items: center; }
+        .bet-btn, #custom-bet { 
+            background: #222; border: 1px solid #444; color: #aaa; 
+            padding: 8px 10px; border-radius: 4px; font-size: 12px; transition: 0.2s;
+        }
+        /* Classe de Seleção Ativa */
+        .active-bet { border-color: gold !important; color: gold !important; background: #332b00 !important; box-shadow: 0 0 10px rgba(255,215,0,0.2); }
+        
+        #custom-bet { width: 60px; color: #fff; text-align: center; outline: none; }
 
-        canvas { background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); border: 6px solid #3e2723; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas { background: radial-gradient(circle, #0b5e28 0%, #053a18 100%); border: 6px solid #3e2723; border-radius: 12px; }
         #timer-container { width: 92%; height: 6px; background: #222; margin-top: 8px; border-radius: 10px; overflow: hidden; }
         #timer-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #f00, #ff0); }
-        #msg-status { position: absolute; top: 50%; transform: translateY(-50%); font-size: 32px; font-weight: bold; display: none; z-index: 100; text-align: center; width: 100%; text-shadow: 2px 2px 5px #000; }
+        #msg-status { position: absolute; top: 50%; transform: translateY(-50%); font-size: 30px; font-weight: bold; display: none; z-index: 100; text-align: center; width: 100%; text-shadow: 2px 2px 5px #000; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div class="stat-box"><span>SALDO</span><br><span id="saldo-display" class="stat-value">R$ 1000.00</span></div>
-        <div class="stat-box"><span>LUCRO (2x)</span><br><span id="lucro-previsto" class="stat-value" style="color: #0f0;">R$ 20.00</span></div>
+        <div class="stat-box"><span>RETORNO (2x)</span><br><span id="lucro-previsto" class="stat-value" style="color: #0f0;">R$ 20.00</span></div>
         <div class="stat-box"><span>TEMPO</span><br><span id="timer-text" class="stat-value" style="color: #ff4444;">03.00</span></div>
     </div>
 
     <div id="bet-selector">
-        <button class="bet-btn active" onclick="updateBet(10, this)">R$ 10</button>
-        <button class="bet-btn" onclick="updateBet(20, this)">R$ 20</button>
-        <button class="bet-btn" onclick="updateBet(50, this)">R$ 50</button>
-        <button class="bet-btn" onclick="updateBet(100, this)">R$ 100</button>
-        <input type="number" id="custom-bet" placeholder="Valor" oninput="updateBet(this.value)">
+        <button class="bet-btn active-bet" onclick="selectBet(10, this)">R$ 10</button>
+        <button class="bet-btn" onclick="selectBet(20, this)">R$ 20</button>
+        <button class="bet-btn" onclick="selectBet(50, this)">R$ 50</button>
+        <button class="bet-btn" onclick="selectBet(100, this)">R$ 100</button>
+        <input type="number" id="custom-bet" placeholder="OUTRO" onfocus="selectCustom()" oninput="updateCustomValue(this.value)">
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -47,14 +52,14 @@
         const timerFill = document.getElementById('timer-fill');
         const saldoDisplay = document.getElementById('saldo-display');
         const lucroPrevisto = document.getElementById('lucro-previsto');
+        const customInput = document.getElementById('custom-bet');
 
         canvas.width = window.innerWidth * 0.94;
         canvas.height = canvas.width * 0.8;
 
-        // LÓGICA MATEMÁTICA PARCIAL
         let saldo = 1000.00;
         let valorAposta = 10;
-        const multiplicador = 2.0; // Multiplica qualquer valor por 2x
+        const multiplicador = 2.0;
 
         let power = 0, charging = false, angle = 0, dragStart = { x: 0, y: 0 };
         let timeLeft = 3.00, timerAtivo = true, aguardandoParar = false;
@@ -63,48 +68,52 @@
         let dourada = { x: canvas.width / 2, y: canvas.height / 2, vx: 0, vy: 0, r: 8, color: '#ffd700' };
         const cacapa = { x: 25, y: 25, r: 16 };
 
-        function updateBet(val, btn) {
+        // LÓGICA DE SELEÇÃO DE ABAS
+        function selectBet(val, btn) {
             if(aguardandoParar) return;
+            valorAposta = val;
+            resetSelection();
+            btn.classList.add('active-bet');
+            customInput.value = ""; // Limpa o custom se clicar no fixo
+            atualizarLucro();
+        }
+
+        function selectCustom() {
+            if(aguardandoParar) return;
+            resetSelection();
+            customInput.classList.add('active-bet');
+            updateCustomValue(customInput.value);
+        }
+
+        function updateCustomValue(val) {
             valorAposta = parseFloat(val) || 0;
-            if(btn) {
-                document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('custom-bet').value = "";
-            }
+            atualizarLucro();
+        }
+
+        function resetSelection() {
+            document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+            customInput.classList.remove('active-bet');
+        }
+
+        function atualizarLucro() {
             lucroPrevisto.innerText = `R$ ${(valorAposta * multiplicador).toFixed(2)}`;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Caçapa
             ctx.fillStyle = '#000';
             ctx.beginPath(); ctx.arc(cacapa.x, cacapa.y, cacapa.r, 0, Math.PI*2); ctx.fill();
 
-            // DESENHO DO TACO (BOLÃO JOGANDO)
             if(charging) {
-                let distTaco = 20 + power; // Taco se afasta conforme a força
+                let distTaco = 20 + power;
                 let tacoX = branca.x - Math.cos(angle) * distTaco;
                 let tacoY = branca.y - Math.sin(angle) * distTaco;
-                
                 ctx.save();
                 ctx.translate(tacoX, tacoY);
                 ctx.rotate(angle);
-                // Desenho do Taco de Madeira
-                ctx.fillStyle = '#4e342e';
-                ctx.fillRect(-150, -3, 150, 6); // Corpo do taco
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(0, -3, 5, 6); // Ponta do taco
+                ctx.fillStyle = '#4e342e'; ctx.fillRect(-150, -3, 150, 6);
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, -3, 5, 6);
                 ctx.restore();
-
-                // Linha de Guia Frontal
-                ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.moveTo(branca.x, branca.y);
-                ctx.lineTo(branca.x + Math.cos(angle) * 100, branca.y + Math.sin(angle) * 100);
-                ctx.strokeStyle = "rgba(255,255,255,0.2)";
-                ctx.stroke();
-                ctx.setLineDash([]);
             }
 
             [branca, dourada].forEach(b => {
@@ -132,7 +141,6 @@
                 if(b.y - b.r < 0 || b.y + b.r > canvas.height) b.vy *= -0.8;
             });
 
-            // Colisão Branca -> Dourada
             let dx = dourada.x - branca.x;
             let dy = dourada.y - branca.y;
             if(Math.hypot(dx, dy) < 16) {
@@ -143,28 +151,20 @@
                 branca.vx *= -0.3; branca.vy *= -0.3;
             }
 
-            // Vitória: Dourada na Caçapa
-            if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < 20) {
-                finalizarRodada(true);
-            }
-
-            if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) {
-                finalizarRodada(false);
-            }
+            if(Math.hypot(dourada.x - cacapa.x, dourada.y - cacapa.y) < 20) finalizarRodada(true);
+            if(aguardandoParar && branca.vx === 0 && dourada.vx === 0) finalizarRodada(false);
         }
 
         function finalizarRodada(acertou, msg) {
             if(!aguardandoParar && !acertou && !msg) return;
             aguardandoParar = false; timerAtivo = false;
-
             if(acertou) {
-                let winAmount = valorAposta * multiplicador;
-                saldo += winAmount;
-                showMsg(`+ R$ ${winAmount.toFixed(2)}!`, "gold");
+                let win = valorAposta * multiplicador;
+                saldo += win;
+                showMsg(`GANHOU R$ ${win.toFixed(2)}!`, "gold");
             } else {
-                showMsg(msg || "TENTE NOVAMENTE!", "#ff4444");
+                showMsg(msg || "ERROU!", "#ff4444");
             }
-
             saldoDisplay.innerText = `R$ ${saldo.toFixed(2)}`;
             setTimeout(reset, 1500);
         }
@@ -184,16 +184,18 @@
         }
 
         canvas.addEventListener('touchstart', (e) => {
-            if(branca.vx === 0 && saldo >= valorAposta) {
+            if(branca.vx === 0 && saldo >= valorAposta && valorAposta > 0) {
                 charging = true;
-                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                dragStart = { x: e.touches.clientX, y: e.touches.clientY };
+            } else if (valorAposta <= 0) {
+                showMsg("INSIRA UM VALOR!", "white");
             }
         });
 
         canvas.addEventListener('touchmove', (e) => {
             if(!charging) return;
-            let dx = dragStart.x - e.touches[0].clientX;
-            let dy = dragStart.y - e.touches[0].clientY;
+            let dx = dragStart.x - e.touches.clientX;
+            let dy = dragStart.y - e.touches.clientY;
             angle = Math.atan2(dy, dx);
             power = Math.min(Math.hypot(dx, dy) / 2, 80);
         });
