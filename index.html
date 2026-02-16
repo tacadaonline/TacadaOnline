@@ -85,32 +85,32 @@ function sortearPosicoes() {
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
 
-    // --- LÓGICA DE POSICIONAMENTO OPOSTO ---
+    // --- LÓGICA DE DISTÂNCIA MÁXIMA ---
 
-    // Definimos a direção oposta ao buraco
+    // 1. Inverte a direção baseado na caçapa (se a caçapa é 0, a bola vai para o fim da largura)
     let dirX = (hole.x < canvas.width / 2) ? 1 : -1;
     let dirY = (hole.y < canvas.height / 2) ? 1 : -1;
 
-    // 1. Ângulo Aleatório: Cria infinitas inclinações para o par de bolas
-    let anguloBase = (Math.random() * (Math.PI / 3)) + (Math.PI / 10); 
+    // 2. Ângulo mais fechado (quase na diagonal oposta) com variação infinita
+    // Isso evita que as bolas fiquem "grudadas" na parede lateral
+    let anguloBase = (Math.PI / 4) + (Math.random() * 0.3 - 0.15); 
 
-    // 2. Distância Longa da Caçapa (conforme seu print)
-    // A amarela ficará entre 65% e 80% de distância do buraco
-    let distDourada = canvas.width * (0.65 + Math.random() * 0.15);
+    // 3. Distâncias LONGAS (conforme seu desenho)
+    // A amarela fica entre 75% e 85% de distância da caçapa
+    let distDourada = canvas.width * (0.75 + Math.random() * 0.10);
 
-    // 3. Distância Curta entre Branca e Amarela
-    // A branca fica logo atrás da amarela (gap de 40 a 60 pixels)
-    let gapBolas = 40 + (Math.random() * 20);
+    // A branca fica logo atrás com um gap curto (35 a 55 pixels)
+    let gapBolas = 35 + (Math.random() * 20);
     let distBranca = distDourada + gapBolas;
 
-    // 4. Cálculo final das coordenadas X e Y
+    // 4. Cálculo das posições X e Y
     dourada.x = hole.x + (Math.cos(anguloBase) * distDourada * dirX);
     dourada.y = hole.y + (Math.sin(anguloBase) * distDourada * dirY);
 
     branca.x = hole.x + (Math.cos(anguloBase) * distBranca * dirX);
     branca.y = hole.y + (Math.sin(anguloBase) * distBranca * dirY);
 
-    // Reset de movimento para a nova rodada
+    // Reset total de velocidade para não bugar o início
     branca.vx = 0; branca.vy = 0; 
     dourada.vx = 0; dourada.vy = 0;
 }
