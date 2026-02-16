@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TACADA ONLINE </title>
+<title>Sinuca Gold Ultra – Master Edition</title>
 <style>
-  /* TRAVAS DE INTERFACE MOBILE */
   * { 
     margin: 0; padding: 0; box-sizing: border-box; 
     -webkit-touch-callout: none; -webkit-user-select: none; 
@@ -16,7 +15,6 @@
     display: flex; flex-direction: column; align-items: center; 
     height: 100vh; overflow: hidden; 
   }
-  
   .header { 
     width: 100%; padding: 12px; display: flex; justify-content: space-around; 
     background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; 
@@ -25,24 +23,24 @@
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
   .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
   
-  #bet-panel { margin: 12px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  #bet-panel { margin: 12px; display: flex; gap: 6px; align-items: center; justify-content: center; }
   .bet-btn, #custom-bet { 
     padding: 10px 14px; background: #222; border: 1px solid #444; 
     color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;
   }
-  .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; box-shadow: 0 0 10px rgba(255,215,0,0.3); }
+  .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
   #custom-bet { width: 75px; color: #fff; text-align: center; outline: none; }
 
   #confirm { 
     margin-bottom: 12px; padding: 12px 35px; background: #00c853; 
     color: #fff; border: none; border-radius: 8px; font-weight: bold; 
-    cursor: pointer; text-transform: uppercase; letter-spacing: 1px; 
+    cursor: pointer; text-transform: uppercase; 
   }
 
   canvas { 
-    background: radial-gradient(circle, #125a2d 0%, #083a1b 100%); 
+    background: radial-gradient(circle, #0e4422 0%, #052b14 100%); 
     border: 12px solid #3e2723; border-radius: 10px; 
-    box-shadow: inset 0 0 50px rgba(0,0,0,0.6), 0 10px 30px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.9);
   }
 
   #msg { 
@@ -56,8 +54,8 @@
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (2x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 20.00</span></div>
-  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">3.00</span></div>
+  <div class="stat-box"><span class="stat-label">Retorno (1.1x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 11.00</span></div>
+  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">1.50</span></div>
 </div>
 
 <div id="bet-panel">
@@ -74,8 +72,25 @@
 <div id="msg"></div>
 
 <script>
-/* ===== MOTOR DE RETENÇÃO (RTP) ===== */
-let dificuldadeRTP = 0.6; // Nível agressivo de desvio
+/* ===== ENGINE DE ÁUDIO E VIBRAÇÃO ===== */
+const somTacada = new Audio('https://assets.mixkit.co');
+const somColisao = new Audio('https://assets.mixkit.co');
+const somCaçapa = new Audio('https://assets.mixkit.co');
+const somErro = new Audio('https://assets.mixkit.co');
+
+function tocar(som) {
+    som.currentTime = 0;
+    som.play().catch(() => {});
+}
+
+function vibrar(ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+}
+
+/* ===== ENGINE DE RETENÇÃO ===== */
+let dificuldadeRTP = 0.9; 
+const multPagamento = 1.1; 
+const tempoJogo = 1.50;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -92,32 +107,27 @@ let saldo = 1000.00;
 let valorAposta = 10;
 let lockedBet = 0;
 let state = "BETTING"; 
-let time = 3.00;
+let time = tempoJogo;
 let timerIniciado = false;
 
-// Bolas (9px) e Caçapa (11px) -> Margem de apenas 2px!
 let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#fff" };
 let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#ffd700" };
 let hole = { x: 0, y: 0, r: 11 };
 
 function sortearPosicoes() {
-    const m = 11; // Colada no canto
-    const cantos = [
-        {x: m, y: m}, {x: canvas.width - m, y: m},
-        {x: m, y: canvas.height - m}, {x: canvas.width - m, y: canvas.height - m}
-    ];
+    const m = 11;
+    const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x;
     hole.y = cantos[indexCanto].y;
 
-    // Posicionamento Diagonal Difícil
     if (hole.x < canvas.width/2) {
-        dourada.x = canvas.width * 0.6; branca.x = canvas.width * 0.88;
+        dourada.x = canvas.width * 0.55; branca.x = canvas.width * 0.85;
     } else {
-        dourada.x = canvas.width * 0.4; branca.x = canvas.width * 0.12;
+        dourada.x = canvas.width * 0.45; branca.x = canvas.width * 0.15;
     }
-    dourada.y = (hole.y < canvas.height/2) ? canvas.height * 0.65 : canvas.height * 0.35;
-    branca.y = (hole.y < canvas.height/2) ? canvas.height * 0.85 : canvas.height * 0.15;
+    dourada.y = (hole.y < canvas.height/2) ? canvas.height * 0.6 : canvas.height * 0.4;
+    branca.y = (hole.y < canvas.height/2) ? canvas.height * 0.8 : canvas.height * 0.2;
     
     branca.vx = 0; branca.vy = 0;
     dourada.vx = 0; dourada.vy = 0;
@@ -125,7 +135,6 @@ function sortearPosicoes() {
 
 sortearPosicoes();
 
-/* ===== SELEÇÃO DE APOSTAS ===== */
 function selectBet(v, btn) {
     if (state !== "BETTING") return;
     valorAposta = v;
@@ -139,7 +148,6 @@ function selectCustom() {
     if (state !== "BETTING") return;
     resetSelection();
     customInput.classList.add('active-bet');
-    updateCustom(customInput.value);
 }
 
 function updateCustom(val) {
@@ -153,28 +161,26 @@ function resetSelection() {
 }
 
 function atualizarLucro() {
-    lucroEl.innerText = `R$ ${(valorAposta * 2).toFixed(2)}`;
+    lucroEl.innerText = `R$ ${(valorAposta * multPagamento).toFixed(2)}`;
 }
 
 function confirmBet() {
     if (state !== "BETTING") return;
-    if (valorAposta <= 0 || saldo < valorAposta) { show("SALDO INSUFICIENTE", "#ff4444"); return; }
+    if (valorAposta <= 0 || saldo < valorAposta) { show("SEM SALDO", "#ff4444"); return; }
     lockedBet = valorAposta;
     saldo -= lockedBet;
     saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     state = "PLAYING";
     document.getElementById("confirm").style.opacity = "0.5";
-    show("BOA SORTE!", "gold");
+    show("MIRA RÁPIDO!", "gold");
 }
 
-/* ===== CONTROLE TOUCH CORRIGIDO ===== */
 let startPos = { x: 0, y: 0 }, power = 0, angle = 0, charging = false;
 
 canvas.addEventListener("touchstart", e => {
     if (state !== "PLAYING" || branca.vx !== 0) return;
     e.preventDefault();
-    const touch = e.touches[0]; // Captura o primeiro dedo
-    startPos = { x: touch.clientX, y: touch.clientY };
+    startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     charging = true;
     timerIniciado = true;
 }, { passive: false });
@@ -182,9 +188,8 @@ canvas.addEventListener("touchstart", e => {
 canvas.addEventListener("touchmove", e => {
     if (!charging) return;
     e.preventDefault();
-    const touch = e.touches[0];
-    let dx = startPos.x - touch.clientX;
-    let dy = startPos.y - touch.clientY;
+    let dx = startPos.x - e.touches[0].clientX;
+    let dy = startPos.y - e.touches[0].clientY;
     angle = Math.atan2(dy, dx);
     power = Math.min(Math.hypot(dx, dy) / 1.6, 100);
 }, { passive: false });
@@ -192,77 +197,66 @@ canvas.addEventListener("touchmove", e => {
 canvas.addEventListener("touchend", e => {
     if (!charging) return;
     e.preventDefault();
+    tocar(somTacada);
+    vibrar(40);
     charging = false;
     branca.vx = Math.cos(angle) * (power / 5.5);
     branca.vy = Math.sin(angle) * (power / 5.5);
     power = 0;
 }, { passive: false });
 
-/* ===== LOOP DE FÍSICA ===== */
 function update() {
     if (state === "PLAYING" && timerIniciado) {
         time -= 1/60;
         tempoEl.innerText = Math.max(0, time).toFixed(2);
-        if (time <= 0) finish(false, "TEMPO ESGOTADO");
+        if (time <= 0) finish(false, "TIMEOUT");
     }
 
     [branca, dourada].forEach(b => {
         b.x += b.vx; b.y += b.vy;
-        b.vx *= 0.985; b.vy *= 0.985; // Atrito da mesa
-        if (b.x - b.r < 0 || b.x + b.r > canvas.width) { b.vx *= -0.7; b.x = b.x < canvas.width/2 ? b.r : canvas.width - b.r; }
-        if (b.y - b.r < 0 || b.y + b.r > canvas.height) { b.vy *= -0.7; b.y = b.y < canvas.height/2 ? b.r : canvas.height - b.r; }
+        b.vx *= 0.96; b.vy *= 0.96; 
+        if (b.x - b.r < 0 || b.x + b.r > canvas.width) { b.vx *= -0.6; b.x = b.x < canvas.width/2 ? b.r : canvas.width - b.r; }
+        if (b.y - b.r < 0 || b.y + b.r > canvas.height) { b.vy *= -0.6; b.y = b.y < canvas.height/2 ? b.r : canvas.height - b.r; }
     });
 
-    // LÓGICA DE DESVIO AGRESSIVO (RTP)
     let distHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
     if (distHole < 55 && dificuldadeRTP > 0) {
         let aD = Math.atan2(dourada.y - hole.y, dourada.x - hole.x);
-        dourada.vx += Math.cos(aD) * (dificuldadeRTP * 0.35);
-        dourada.vy += Math.sin(aD) * (dificuldadeRTP * 0.35);
+        dourada.vx += Math.cos(aD) * (dificuldadeRTP * 0.45); 
     }
 
-    // Colisão Branca -> Dourada
     let dx = dourada.x - branca.x;
     let dy = dourada.y - branca.y;
     if (Math.hypot(dx, dy) < branca.r + dourada.r) {
+        tocar(somColisao);
+        vibrar(20);
         let a = Math.atan2(dy, dx);
         let v = Math.hypot(branca.vx, branca.vy);
-        dourada.vx = Math.cos(a) * v * 0.88; 
-        dourada.vy = Math.sin(a) * v * 0.88;
+        dourada.vx = Math.cos(a) * v * 0.85; 
+        dourada.vy = Math.sin(a) * v * 0.85;
         branca.vx *= -0.4; branca.vy *= -0.4;
     }
 
-    // Vitória Exata (Precisão de 4px)
     if (distHole < hole.r - 4) finish(true);
-    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 2.8) finish(false, "ERROU");
+    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 1.3) finish(false, "ERROU");
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Ombros/Quinas da Mesa
-    ctx.fillStyle = "#261512";
-    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r + 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#261512"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r + 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
 
-    // Caçapa
-    ctx.fillStyle = "#000";
-    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
-
-    // Mira Dinâmica
     if (charging && state === "PLAYING") {
         ctx.beginPath(); ctx.setLineDash([]);
         ctx.moveTo(branca.x, branca.y);
-        ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.3), branca.y + Math.sin(angle) * (power * 1.3));
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.stroke();
+        ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; ctx.stroke();
     }
 
-    // Bolas com Efeito 3D
     [branca, dourada].forEach(b => {
         let grad = ctx.createRadialGradient(b.x-2, b.y-2, 1, b.x, b.y, b.r);
         grad.addColorStop(0, "#fff"); grad.addColorStop(1, b.color);
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
     });
 }
 
@@ -270,17 +264,21 @@ function finish(win, msg) {
     if (state !== "PLAYING") return;
     state = "RESULT";
     if (win) {
-        let gain = lockedBet * 2;
+        tocar(somCaçapa);
+        let gain = lockedBet * multPagamento;
         saldo += gain;
-        show(`GREEN R$ ${gain.toFixed(2)}`, "gold");
-    } else { show(msg || "LOSS", "#ff4444"); }
+        show(`GREEN R$ ${(lockedBet * 0.1).toFixed(2)}`, "gold");
+    } else { 
+        tocar(somErro);
+        show(msg || "LOSS", "#ff4444"); 
+    }
     saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     setTimeout(reset, 1500);
 }
 
 function reset() {
     sortearPosicoes();
-    time = 3.00; tempoEl.innerText = "3.00"; timerIniciado = false;
+    time = tempoJogo; tempoEl.innerText = tempoJogo.toFixed(2); timerIniciado = false;
     state = "BETTING";
     document.getElementById("confirm").style.opacity = "1";
     atualizarLucro();
