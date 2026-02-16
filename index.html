@@ -1,96 +1,73 @@
 <script>
-/* ===== CONTROLE DE SOM ===== */
+/* ================= INÍCIO ================= */
+
+/* ===== SOM ===== */
 let somLigado = true;
 let volumeGlobal = 0.6;
 
-/* ===== ÁUDIOS ===== */
 const somTacada  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-billiard-ball-hit-2148.mp3");
 const somColisao = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-wood-hit-2152.mp3");
 const somCaçapa  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3");
 const somErro    = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3");
 const somClique  = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3");
 
-function tocar(audio) {
-    if (!somLigado) return;
+function tocar(audio){
+    if(!somLigado) return;
     const s = audio.cloneNode();
     s.volume = volumeGlobal;
     s.play().catch(()=>{});
 }
 
-/* ===== DESBLOQUEIO DE ÁUDIO (iOS) ===== */
-document.body.addEventListener("touchstart", () => {
+/* desbloqueia áudio no iOS */
+document.body.addEventListener("touchstart", ()=>{
     tocar(somClique);
-}, { once: true });
+},{once:true});
 
-/* ===== CONFIGURAÇÕES ===== */
-let dificuldadeRTP = 0.3;
+/* ===== CONFIG ===== */
 const multPagamento = 2.0;
 const tempoJogo = 2.50;
 
-/* ===== CANVAS ===== */
+/* ===== ELEMENTOS ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.8;
 
-/* ===== ELEMENTOS ===== */
 const saldoEl = document.getElementById("saldo");
 const lucroEl = document.getElementById("lucro");
 const tempoEl = document.getElementById("tempo");
 const msgEl = document.getElementById("msg");
-const customInput = document.getElementById("custom-bet");
 const btnSom = document.getElementById("btnSom");
 
 /* ===== ESTADO ===== */
-let saldo = 1000.00;
+let saldo = 1000;
 let valorAposta = 10;
 let lockedBet = 0;
 let state = "BETTING";
 let time = tempoJogo;
-let timerIniciado = false;
 
 /* ===== BOLAS ===== */
-let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#fff" };
-let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 11 };
-
-function sortearPosicoes() {
-    const m = 11;
-    const cantos = [
-        {x:m,y:m}, 
-        {x:canvas.width-m,y:m}, 
-        {x:m,y:canvas.height-m}, 
-        {x:canvas.width-m,y:canvas.height-m}
-    ];
-    const c = cantos[Math.floor(Math.random()*4)];
-    hole.x = c.x; hole.y = c.y;
-
-    dourada.x = hole.x < canvas.width/2 ? canvas.width*0.6 : canvas.width*0.4;
-    dourada.y = hole.y < canvas.height/2 ? canvas.height*0.6 : canvas.height*0.4;
-
-    branca.x = hole.x < canvas.width/2 ? canvas.width*0.85 : canvas.width*0.15;
-    branca.y = hole.y < canvas.height/2 ? canvas.height*0.8 : canvas.height*0.2;
-
-    branca.vx = branca.vy = dourada.vx = dourada.vy = 0;
-}
-sortearPosicoes();
+let branca = {x:100,y:100,vx:0,vy:0,r:9,color:"#fff"};
+let dourada = {x:200,y:200,vx:0,vy:0,r:9,color:"#ffd700"};
+let hole = {x:50,y:50,r:11};
 
 /* ===== SOM ON/OFF ===== */
-btnSom.onclick = () => {
+btnSom.onclick = ()=>{
     somLigado = !somLigado;
     btnSom.innerText = somLigado ? "🔊" : "🔇";
 };
 
-/* ===== APOSTA ===== */
-function atualizarLucro() {
+/* ===== LUCRO ===== */
+function atualizarLucro(){
     lucroEl.innerText = `R$ ${(valorAposta * multPagamento).toFixed(2)}`;
 }
+atualizarLucro();
 
-function confirmBet() {
-    if (state !== "BETTING") return;
-    if (valorAposta <= 0 || saldo < valorAposta) {
+/* ===== APOSTA ===== */
+function confirmBet(){
+    if(state !== "BETTING") return;
+    if(valorAposta <= 0 || saldo < valorAposta){
         tocar(somErro);
-        show("SEM SALDO", "#ff4444");
         return;
     }
 
@@ -101,110 +78,38 @@ function confirmBet() {
 
     state = "PLAYING";
     time = tempoJogo;
-    timerIniciado = false;
-    show("MIRA!", "gold");
 }
 
-/* ===== CONTROLES ===== */
-let startPos = {x:0,y:0}, power=0, angle=0, charging=false;
-
-canvas.addEventListener("touchstart", e => {
-    if (state !== "PLAYING" || branca.vx !== 0) return;
-    startPos = { x:e.touches[0].clientX, y:e.touches[0].clientY };
-    charging = true;
-    timerIniciado = true;
-},{passive:false});
-
-canvas.addEventListener("touchmove", e => {
-    if (!charging) return;
-    let dx = startPos.x - e.touches[0].clientX;
-    let dy = startPos.y - e.touches[0].clientY;
-    angle = Math.atan2(dy, dx);
-    power = Math.min(Math.hypot(dx,dy)/1.6, 100);
-},{passive:false});
-
-canvas.addEventListener("touchend", () => {
-    if (!charging) return;
-    tocar(somTacada);
-    charging = false;
-    branca.vx = Math.cos(angle)*(power/5.5);
-    branca.vy = Math.sin(angle)*(power/5.5);
-    power = 0;
-},{passive:false});
-
-/* ===== LOOP ===== */
-function update() {
-    if (state === "PLAYING" && timerIniciado) {
-        time -= 1/60;
-        tempoEl.innerText = Math.max(0,time).toFixed(2);
-        if (time <= 0) finish(false, "TIME");
-    }
-
-    [branca, dourada].forEach(b=>{
-        b.x+=b.vx; b.y+=b.vy;
-        b.vx*=0.985; b.vy*=0.985;
-    });
-
-    let dx=dourada.x-branca.x, dy=dourada.y-branca.y;
-    if (Math.hypot(dx,dy)<branca.r+dourada.r){
-        tocar(somColisao);
-        let a=Math.atan2(dy,dx);
-        let v=Math.hypot(branca.vx,branca.vy);
-        dourada.vx=Math.cos(a)*v*0.9;
-        dourada.vy=Math.sin(a)*v*0.9;
-        branca.vx*=-0.4; branca.vy*=-0.4;
-    }
-
-    if (Math.hypot(dourada.x-hole.x,dourada.y-hole.y)<hole.r)
-        finish(true);
-}
-
-function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="#000";
-    ctx.beginPath();
-    ctx.arc(hole.x,hole.y,hole.r,0,Math.PI*2);
-    ctx.fill();
-
-    [branca,dourada].forEach(b=>{
-        ctx.fillStyle=b.color;
-        ctx.beginPath();
-        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-        ctx.fill();
-    });
-}
-
-function finish(win,msg){
-    if(state!=="PLAYING")return;
-    state="RESULT";
+/* ===== RESULTADO ===== */
+function finish(win){
+    if(state !== "PLAYING") return;
+    state = "RESULT";
 
     if(win){
         tocar(somCaçapa);
-        saldo+=lockedBet*2;
+        saldo += lockedBet * 2;
         show(`GREEN +R$ ${lockedBet.toFixed(2)}`,"gold");
     }else{
         tocar(somErro);
-        show(msg||"LOSS","#ff4444");
+        show("LOSS","#ff4444");
     }
 
-    saldoEl.innerText=`R$ ${saldo.toFixed(2)}`;
+    saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     setTimeout(reset,1500);
 }
 
 function reset(){
-    sortearPosicoes();
-    state="BETTING";
-    time=tempoJogo;
-    tempoEl.innerText=tempoJogo.toFixed(2);
+    state = "BETTING";
+    time = tempoJogo;
 }
 
+/* ===== UI ===== */
 function show(t,c){
-    msgEl.innerText=t;
-    msgEl.style.color=c;
-    msgEl.style.display="block";
+    msgEl.innerText = t;
+    msgEl.style.color = c;
+    msgEl.style.display = "block";
     setTimeout(()=>msgEl.style.display="none",1200);
 }
 
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
-loop();
+/* ================= FIM ================= */
 </script>
