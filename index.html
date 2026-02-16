@@ -24,7 +24,7 @@
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (2.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 11.00</span></div>
+  <div class="stat-box"><span class="stat-label">Retorno (2.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 20.00</span></div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
@@ -74,12 +74,12 @@ let state = "BETTING";
 let time = tempoJogo;
 let timerIniciado = false;
 
-let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#fff" };
-let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 9, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 11 };
+let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 7, color: "#fff" };
+let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 7, color: "#ffd700" };
+let hole = { x: 0, y: 0, r: 7 };
 
 function sortearPosicoes() {
-    const m = 11;
+    const m = 0;
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x;
@@ -160,8 +160,8 @@ canvas.addEventListener("touchend", e => {
     tocar(somTacada);
     if(navigator.vibrate) navigator.vibrate(40);
     charging = false;
-    branca.vx = Math.cos(angle) * (power / 5.5);
-    branca.vy = Math.sin(angle) * (power / 5.5);
+    branca.vx = Math.cos(angle) * (power / 4.5);
+    branca.vy = Math.sin(angle) * (power / 4.5);
     power = 0;
 }, { passive: false });
 
@@ -169,7 +169,7 @@ function update() {
     if (state === "PLAYING" && timerIniciado) {
         time -= 1/60;
         tempoEl.innerText = Math.max(0, time).toFixed(2);
-        if (time <= 0) finish(false, "TIMEOUT");
+        if (time <= 0) finish(false, "ERROU");
     }
 
     [branca, dourada].forEach(b => {
@@ -203,7 +203,7 @@ function update() {
     }
 
     if (distHole < hole.r - 4) finish(true);
-    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 1.3) finish(false, "ERROU");
+    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 2.5) finish(false, "ERROU");
 }
 
 function draw() {
