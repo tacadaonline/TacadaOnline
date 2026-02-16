@@ -190,16 +190,47 @@ function update() {
         dourada.vy *= (1 - (dificuldadeRTP * 0.02));
     }
 
+    // --- COLISÃO ENTRE BRANCA E DOURADA ---
     let dx = dourada.x - branca.x;
     let dy = dourada.y - branca.y;
-    if (Math.hypot(dx, dy) < branca.r + dourada.r) {
+    let distancia = Math.hypot(dx, dy);
+    let raioMinimo = branca.r + dourada.r;
+
+    if (distancia < raioMinimo) {
         tocar(somColisao);
-        if(navigator.vibrate) navigator.vibrate(20);
-        let a = Math.atan2(dy, dx);
-        let v = Math.hypot(branca.vx, branca.vy);
-        dourada.vx = Math.cos(a) * v * 0.88; 
-        dourada.vy = Math.sin(a) * v * 0.88;
-        branca.vx *= -0.4; branca.vy *= -0.4;
+        
+        // 1. RESOLUÇÃO DE SOBREPOSIÇÃO (O Segredo para não bugar)
+        // Move as bolas para fora uma da outra imediatamente
+        let sobreposicao = raioMinimo - distancia;
+        let nx = dx / distancia; // Vetor normal X
+        let ny = dy / distancia; // Vetor normal Y
+        
+        // Afasta cada bola metade da distância necessária
+        branca.x -= nx * (sobreposicao / 2);
+        branca.y -= ny * (sobreposicao / 2);
+        dourada.x += nx * (sobreposicao / 2);
+        dourada.y += ny * (sobreposicao / 2);
+
+        // 2. TROCA DE VELOCIDADES (Física de Bilhar)
+        // Projeta a velocidade no vetor da colisão
+        let v1n = branca.vx * nx + branca.vy * ny;
+        let v2n = dourada.vx * nx + dourada.vy * ny;
+
+        // Inverte as velocidades na linha de impacto (conservação de momento simplificada)
+        let v1nDepois = v2n;
+        let v2nDepois = v1n;
+
+        // Aplica de volta às velocidades originais
+        branca.vx += (v1nDepois - v1n) * nx;
+        branca.vy += (v1nDepois - v1n) * ny;
+        dourada.vx += (v2nDepois - v2n) * nx;
+        dourada.vy += (v2nDepois - v2n) * ny;
+    }
+
+    // --- VERIFICAR SE CAIU NA CAÇAPA ---
+    let distDouradaHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
+    if (distDouradaHole < hole.r + 5) {
+        finish(true, "VOCÊ VENCEU!");
     }
 
     if (distHole < hole.r - 4) finish(true);
