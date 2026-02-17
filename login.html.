@@ -66,7 +66,7 @@
             const erroEl = document.getElementById('erro');
 
             // Substitua pela URL que o Render te der
-            const url = 'http://localhost:3000/login'; 
+            const url = 'https://tacadaonline-backend.onrender.com/login'; 
 
             try {
                 const response = await fetch(url, {
