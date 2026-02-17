@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TACADA ONLINE </title>
+<title>TACADA ONLINE</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
@@ -17,14 +17,14 @@
   #custom-bet { width: 75px; color: #fff; text-align: center; outline: none; }
   #confirm { margin-bottom: 12px; padding: 12px 35px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
   canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 12px solid #3e2723; border-radius: 10px; box-shadow: inset 0 0 60px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.9); }
-  #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; pointer-events: none; }
+  #msg { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; pointer-events: none; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 1000.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (2.4x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 24.00</span></div>
+  <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
+  <div class="stat-box"><span class="stat-label">Retorno (3.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 30.00</span></div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
@@ -42,33 +42,38 @@
 <div id="msg"></div>
 
 <script>
-/* ===== ÁUDIOS (VERSÃO FUNCIONAL) ===== */
-// Substitua estas URLs pelos links que você gerou no ScreenApp
-const somTacada = new Audio('https://screenapp.io/audio/tacada.mp3'); 
-const somColisao = new Audio('https://screenapp.io/audio/colisao.mp3');
-const somCaçapa = new Audio('https://screenapp.io/audio/vitoria.mp3');
-const somErro = new Audio('https://screenapp.io/audio/erro.mp3');
-const somClique = new Audio('https://screenapp.io/audio/clique.mp3');
+/* ===== LOGICA DE CONEXÃO ===== */
+let usuarioLogado = localStorage.getItem("usuario");
+let saldo = 0;
 
-// Configurações de volume
-somTacada.volume = 0.4;
-somColisao.volume = 0.3;
-somCaçapa.volume = 0.5;
-somErro.volume = 0.4;
-somClique.volume = 0.2;
-
-// Função melhorada para tocar sons
-function tocar(som) {
-    som.currentTime = 0;
-    som.play().catch(erro => {
-        console.log("Áudio bloqueado pelo navegador, aguardando interação");
-    });
+async function carregarSaldo() {
+    if (!usuarioLogado) { window.location.href = "/"; return; }
+    // O saldo inicial vem do localStorage (salvo no login)
+    saldo = parseFloat(localStorage.getItem("saldo")) || 0;
+    document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
 }
 
-/* ===== CONFIGURAÇÕES RTP STEALTH ===== */
-let dificuldadeRTP = 0.5; // 0.3 é indetectável. 0.9 é "azar" total.
-const multPagamento = 2.0;
-const tempoJogo = 2.50;
+async function atualizarSaldoNoBanco(valorMudanca) {
+    try {
+        const response = await fetch("/update-saldo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: usuarioLogado, valor: valorMudanca })
+        });
+        const data = await response.json();
+        if (data.success) {
+            saldo = data.novoSaldo;
+            document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
+            localStorage.setItem("saldo", saldo);
+        }
+    } catch (err) { console.error("Erro ao atualizar saldo"); }
+}
+
+/* ===== AUDIO & CONFIGS ===== */
+const somTacada = new Audio('https://screenapp.io'); 
+const somCaçapa = new Audio('https://screenapp.io');
+const somErro = new Audio('https://screenapp.io');
+const somClique = new Audio('https://screenapp.io');
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -81,23 +86,21 @@ const tempoEl = document.getElementById("tempo");
 const msgEl = document.getElementById("msg");
 const customInput = document.getElementById("custom-bet");
 
-let saldo = 1000.00;
 let valorAposta = 10;
 let lockedBet = 0;
 let state = "BETTING"; 
-let time = tempoJogo;
+let time = 2.50;
 let timerIniciado = false;
 
-let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 7, color: "#fff" };
-let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 7, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 7 };
+let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#fff" };
+let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#ffd700" };
+let hole = { x: 0, y: 0, r: 12 };
 
 function sortearPosicoes() {
-    const m = 2;
+    const m = 15;
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const indexCanto = Math.floor(Math.random() * 4);
-    hole.x = cantos[indexCanto].x;
-    hole.y = cantos[indexCanto].y;
+    hole.x = cantos[indexCanto].x; hole.y = cantos[indexCanto].y;
     dourada.x = (hole.x < canvas.width/2) ? canvas.width * 0.6 : canvas.width * 0.4;
     branca.x = (hole.x < canvas.width/2) ? canvas.width * 0.85 : canvas.width * 0.15;
     dourada.y = (hole.y < canvas.height/2) ? canvas.height * 0.6 : canvas.height * 0.4;
@@ -105,22 +108,18 @@ function sortearPosicoes() {
     branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
 }
 
-sortearPosicoes();
-
 function selectBet(v, btn) {
     if (state !== "BETTING") return;
-    tocar(somClique);
-    valorAposta = v;
-    resetSelection();
+    somClique.play(); valorAposta = v;
+    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+    customInput.classList.remove('active-bet');
     btn.classList.add('active-bet');
-    customInput.value = "";
     atualizarLucro();
 }
 
 function selectCustom() {
     if (state !== "BETTING") return;
-    tocar(somClique);
-    resetSelection();
+    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     customInput.classList.add('active-bet');
 }
 
@@ -129,183 +128,123 @@ function updateCustom(val) {
     atualizarLucro();
 }
 
-function resetSelection() {
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    customInput.classList.remove('active-bet');
-}
-
 function atualizarLucro() {
-    lucroEl.innerText = `R$ ${(valorAposta * 2.4).toFixed(2)}`;
+    lucroEl.innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
 
-function confirmBet() {
+async function confirmBet() {
     if (state !== "BETTING") return;
     if (valorAposta <= 0 || saldo < valorAposta) { show("SEM SALDO", "#ff4444"); return; }
+    
     lockedBet = valorAposta;
-    saldo -= lockedBet;
-    saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
     state = "PLAYING";
+    await atualizarSaldoNoBanco(-lockedBet); // Desconta aposta
+    
     document.getElementById("confirm").style.opacity = "0.5";
     show("MIRA! BOA SORTE", "gold");
+    setTimeout(() => msgEl.style.display = "none", 1500);
 }
 
+/* ===== CONTROLES ===== */
 let startPos = { x: 0, y: 0 }, power = 0, angle = 0, charging = false;
 
 canvas.addEventListener("touchstart", e => {
-    if (state !== "PLAYING" || branca.vx !== 0) return;
-    e.preventDefault();
+    if (state !== "PLAYING" || branca.vx !== 0 || branca.vy !== 0) return;
     startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    charging = true;
-    timerIniciado = true;
-}, { passive: false });
+    charging = true; timerIniciado = true;
+});
 
 canvas.addEventListener("touchmove", e => {
     if (!charging) return;
-    e.preventDefault();
     let dx = startPos.x - e.touches[0].clientX;
     let dy = startPos.y - e.touches[0].clientY;
     angle = Math.atan2(dy, dx);
-    power = Math.min(Math.hypot(dx, dy) / 1.6, 100);
-}, { passive: false });
+    power = Math.min(Math.hypot(dx, dy) / 1.5, 50);
+});
 
-canvas.addEventListener("touchend", e => {
+canvas.addEventListener("touchend", () => {
     if (!charging) return;
-    e.preventDefault();
-    tocar(somTacada);
-    if(navigator.vibrate) navigator.vibrate(40);
+    somTacada.play();
     charging = false;
-    branca.vx = Math.cos(angle) * (power / 5.0);
-    branca.vy = Math.sin(angle) * (power / 5.0);
+    branca.vx = Math.cos(angle) * (power / 4);
+    branca.vy = Math.sin(angle) * (power / 4);
     power = 0;
-}, { passive: false });
+});
 
+/* ===== LOOP DO JOGO ===== */
 function update() {
     if (state === "PLAYING" && timerIniciado) {
         time -= 1/60;
         tempoEl.innerText = Math.max(0, time).toFixed(2);
-        if (time <= 0) finish(false, "ERROU");
+        if (time <= 0) finish(false, "TEMPO ESGOTADO!");
     }
 
     [branca, dourada].forEach(b => {
         b.x += b.vx; b.y += b.vy;
         b.vx *= 0.985; b.vy *= 0.985;
+        if (Math.abs(b.vx) < 0.1) b.vx = 0;
+        if (Math.abs(b.vy) < 0.1) b.vy = 0;
         if (b.x - b.r < 0 || b.x + b.r > canvas.width) { b.vx *= -0.7; b.x = b.x < canvas.width/2 ? b.r : canvas.width - b.r; }
         if (b.y - b.r < 0 || b.y + b.r > canvas.height) { b.vy *= -0.7; b.y = b.y < canvas.height/2 ? b.r : canvas.height - b.r; }
     });
 
-    /* --- DESVIO STEALTH (TANGENCIAL) --- */
-    let distHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
-    if (distHole < 65 && dificuldadeRTP > 0) {
-        let aD = Math.atan2(dourada.y - hole.y, dourada.x - hole.x);
-        let desvioLateral = Math.PI / 2; 
-        dourada.vx += Math.cos(aD + desvioLateral) * (dificuldadeRTP * 0.02);
-        dourada.vy += Math.sin(aD + desvioLateral) * (dificuldadeRTP * 0.02);
-        dourada.vx *= (1 - (dificuldadeRTP * 0.02)); 
-        dourada.vy *= (1 - (dificuldadeRTP * 0.02));
+    // Colisão Branca x Dourada
+    let dist = Math.hypot(branca.x - dourada.x, branca.y - dourada.y);
+    if (dist < branca.r + dourada.r) {
+        let a = Math.atan2(dourada.y - branca.y, dourada.x - branca.x);
+        let s = Math.hypot(branca.vx, branca.vy);
+        dourada.vx = Math.cos(a) * s * 0.9;
+        dourada.vy = Math.sin(a) * s * 0.9;
+        branca.vx *= -0.3; branca.vy *= -0.3;
     }
 
-// --- COLISÃO ENTRE BRANCA E DOURADA ---
-    let dx = dourada.x - branca.x;
-    let dy = dourada.y - branca.y;
-    let distancia = Math.hypot(dx, dy);
-    let raioMinimo = branca.r + dourada.r;
-
-    if (distancia < raioMinimo) {
-        tocar(somColisao);
-        
-        // 1. RESOLUÇÃO DE SOBREPOSIÇÃO (O Segredo para não bugar)
-        // Move as bolas para fora uma da outra imediatamente
-        let sobreposicao = raioMinimo - distancia;
-        let nx = dx / distancia; // Vetor normal X
-        let ny = dy / distancia; // Vetor normal Y
-        
-        // Afasta cada bola metade da distância necessária
-        branca.x -= nx * (sobreposicao / 2);
-        branca.y -= ny * (sobreposicao / 2);
-        dourada.x += nx * (sobreposicao / 2);
-        dourada.y += ny * (sobreposicao / 2);
-
-        // 2. TROCA DE VELOCIDADES (Física de Bilhar)
-        // Projeta a velocidade no vetor da colisão
-        let v1n = branca.vx * nx + branca.vy * ny;
-        let v2n = dourada.vx * nx + dourada.vy * ny;
-
-        // Inverte as velocidades na linha de impacto (conservação de momento simplificada)
-        let v1nDepois = v2n;
-        let v2nDepois = v1n;
-
-        // Aplica de volta às velocidades originais
-        branca.vx += (v1nDepois - v1n) * nx;
-        branca.vy += (v1nDepois - v1n) * ny;
-        dourada.vx += (v2nDepois - v2n) * nx;
-        dourada.vy += (v2nDepois - v2n) * ny;
+    // Vitoria: Dourada na caçapa
+    if (Math.hypot(dourada.x - hole.x, dourada.y - hole.y) < hole.r + 5) {
+        finish(true, "VOCÊ GANHOU!");
     }
-
-    // --- VERIFICAR SE CAIU NA CAÇAPA ---
-    let distDouradaHole = Math.hypot(dourada.x - hole.x, dourada.y - hole.y);
-    if (distDouradaHole < hole.r + 5) {
-        finish(true, "VOCÊ VENCEU!");
-    }
-
-    if (distHole < hole.r - 4) finish(true);
-    if (state === "PLAYING" && timerIniciado && !charging && branca.vx === 0 && dourada.vx === 0 && time < 2.5) finish(false, "ERROU");
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#261512"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r + 10, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
-
-    if (charging && state === "PLAYING") {
-        ctx.beginPath();
-        ctx.moveTo(branca.x, branca.y);
-        ctx.lineTo(branca.x + Math.cos(angle) * (power * 1.2), branca.y + Math.sin(angle) * (power * 1.2));
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; ctx.stroke();
-    }
-
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Caçapa
+    ctx.fillStyle = "#000";
+    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill();
+    // Bolas
     [branca, dourada].forEach(b => {
-        let grad = ctx.createRadialGradient(b.x-2, b.y-2, 1, b.x, b.y, b.r);
-        grad.addColorStop(0, "#fff"); grad.addColorStop(1, b.color);
-        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = b.color;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.stroke();
     });
-}
-
-function finish(win, msg) {
-    if (state !== "PLAYING") return;
-    state = "RESULT";
-
-    if (win) {
-        tocar(somCaçapa);
-
-        // retorno total = aposta + lucro
-        let retornoTotal = lockedBet * 2.4;
-
-        saldo += retornoTotal;
-     let lucroreal = retornoTotal - lockedBet;
-
-        show(`GREEN +R$ ${lockedBet.toFixed(2)}`, "gold");
-    } else {
-        tocar(somErro);
-        show(msg || "LOSS", "#ff4444");
+    // Mira
+    if (charging) {
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.beginPath(); ctx.moveTo(branca.x, branca.y);
+        ctx.lineTo(branca.x + Math.cos(angle)*power*2, branca.y + Math.sin(angle)*power*2);
+        ctx.stroke();
     }
-
-    saldoEl.innerText = `R$ ${saldo.toFixed(2)}`;
-    setTimeout(reset, 1500);
 }
 
-function reset() {
-    sortearPosicoes();
-    time = tempoJogo; tempoEl.innerText = tempoJogo.toFixed(2); timerIniciado = false;
-    state = "BETTING";
-    document.getElementById("confirm").style.opacity = "1";
+async function finish(win, text) {
+    if (state !== "PLAYING") return;
+    state = "FINISHED"; timerIniciado = false;
+    if (win) { 
+        somCaçapa.play(); show(text, "#0f0");
+        await atualizarSaldoNoBanco(lockedBet * 3); 
+    } else { 
+        somErro.play(); show(text, "#f44"); 
+    }
+    setTimeout(() => {
+        state = "BETTING"; time = 2.50; tempoEl.innerText = "2.50";
+        document.getElementById("confirm").style.opacity = "1";
+        msgEl.style.display = "none"; sortearPosicoes();
+    }, 2500);
 }
 
-function show(t, c) {
-    msgEl.innerText = t; msgEl.style.color = c; msgEl.style.display = "block";
-    setTimeout(() => msgEl.style.display = "none", 1500);
-}
+function show(t, c) { msgEl.innerText = t; msgEl.style.color = c; msgEl.style.display = "block"; }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
+carregarSaldo();
+sortearPosicoes();
 loop();
 </script>
 </body>
