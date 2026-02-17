@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
 // --- CONEXÃO COM O MONGODB (SEU LINK APLICADO) ---
-const MONGO_URI = "mongodb+srv://joaoprofvitor:Mama%2Fmama1*@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
+const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
 // Nota: Usei %2F no lugar da barra na senha para evitar erro de leitura do link.
 
 mongoose.connect(MONGO_URI)
