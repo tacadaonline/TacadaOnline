@@ -37,7 +37,7 @@ app.use((req, res, next) => {
 // --- ROTAS DE PÁGINAS ---
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/cadastro.html", (req, res) => res.sendFile(path.join(__dirname, "cadastro.html")));
-app.get("/jogo.html", (req, res) => res.sendFile(path.join(__dirname, "index.html"))); // Ajustado para seu index
+app.get("/jogo.html", (req, res) => res.sendFile(path.join(__dirname, "jogo.html"))); // Ajustado para seu index
 
 // --- ROTA DE CADASTRO ---
 app.post("/register", async (req, res) => {
