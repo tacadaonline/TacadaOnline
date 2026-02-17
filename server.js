@@ -9,19 +9,21 @@ const app = express();
 // --- CONFIGURAÇÕES ---
 app.use(cors());
 app.use(express.json());
+// Serve arquivos estáticos da pasta raiz
 app.use(express.static(path.join(__dirname, ".")));
 
-// --- CONEXÃO COM O MONGODB (SEU LINK APLICADO) ---
+// --- CONEXÃO COM O MONGODB ---
 const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
-// Nota: Usei %2F no lugar da barra na senha para evitar erro de leitura do link.
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ BANCO DE DADOS CONECTADO COM SUCESSO!"))
-    .catch(err => console.error("❌ ERRO AO CONECTAR BANCO:", err));
+mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000 // Desiste após 5s se o banco não responder
+})
+.then(() => console.log("✅ BANCO DE DADOS CONECTADO!"))
+.catch(err => console.error("❌ ERRO AO CONECTAR BANCO:", err));
 
-// --- MODELO DE USUÁRIO (BLINDAGEM DE DADOS) ---
+// --- MODELO DE USUÁRIO ---
 const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
+    username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 }
 });
@@ -32,50 +34,54 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
 app.get("/cadastro.html", (req, res) => res.sendFile(path.join(__dirname, "cadastro.html")));
 app.get("/jogo.html", (req, res) => res.sendFile(path.join(__dirname, "jogo.html")));
 
-// --- ROTA DE CADASTRO (SALVANDO NO BANCO) ---
+// --- ROTA DE CADASTRO ---
 app.post("/register", async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ success: false, msg: "Preencha tudo!" });
 
-        const existe = await User.findOne({ username });
+        const userClean = username.trim();
+        const existe = await User.findOne({ username: userClean });
         if (existe) return res.status(400).json({ success: false, msg: "Usuário já existe!" });
 
-        // Criptografia da senha
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const novoUsuario = new User({ username, password: hashedPassword });
+        const novoUsuario = new User({ username: userClean, password: hashedPassword });
         await novoUsuario.save();
 
-        res.json({ success: true, msg: "Cadastro realizado!" });
+        return res.json({ success: true, msg: "Cadastro realizado!" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, msg: "Erro interno no servidor" });
+        console.error("ERRO NO REGISTER:", err);
+        return res.status(500).json({ success: false, msg: "Erro interno no servidor" });
     }
 });
 
-// --- ROTA DE LOGIN (COMPARANDO COM O BANCO) ---
+// --- ROTA DE LOGIN ---
 app.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
-        const usuario = await User.findOne({ username });
+        const userClean = username.trim();
+        const usuario = await User.findOne({ username: userClean });
 
         if (!usuario) return res.status(401).json({ success: false, msg: "Usuário não encontrado" });
 
-        // Compara senha digitada com a criptografada
         const senhaValida = await bcrypt.compare(password, usuario.password);
         if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
 
-        res.json({ 
+        return res.json({ 
             success: true, 
             saldo: usuario.saldo, 
-            msg: "Login realizado com sucesso!" 
+            msg: "Login realizado!" 
         });
     } catch (err) {
-        res.status(500).json({ success: false, msg: "Erro no login" });
+        console.error("ERRO NO LOGIN:", err);
+        return res.status(500).json({ success: false, msg: "Erro no login" });
     }
 });
 
+// --- INICIALIZAÇÃO (AJUSTE PARA RENDER) ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor rodando na porta ${PORT}`);
+});
