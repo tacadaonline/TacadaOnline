@@ -9,17 +9,15 @@ const app = express();
 // --- CONFIGURAÇÕES ---
 app.use(cors());
 app.use(express.json());
-// Serve arquivos estáticos da pasta raiz
 app.use(express.static(path.join(__dirname, ".")));
 
-// --- CONEXÃO COM O MONGODB ---
-const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority&appName=Cluster0";
+// --- CONEXÃO COM O MONGODB (ESTRUTURA REFORÇADA) ---
+const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 5000 // Desiste após 5s se o banco não responder
-})
-.then(() => console.log("✅ BANCO DE DADOS CONECTADO!"))
-.catch(err => console.error("❌ ERRO AO CONECTAR BANCO:", err));
+// Conectar ao banco com tratamento de erro global
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("✅ CONEXÃO ESTABELECIDA COM O MONGODB!"))
+    .catch(err => console.error("❌ FALHA CRÍTICA NA CONEXÃO:", err));
 
 // --- MODELO DE USUÁRIO ---
 const UserSchema = new mongoose.Schema({
@@ -29,10 +27,18 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model("User", UserSchema);
 
+// --- MIDDLEWARE DE CHECAGEM DE BANCO ---
+// Impede que as rotas rodem se o banco estiver offline
+app.use((req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ success: false, msg: "Banco de dados ainda está conectando... tente em 5 segundos." });
+    }
+    next();
+});
+
 // --- ROTAS DE PÁGINAS ---
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
 app.get("/cadastro.html", (req, res) => res.sendFile(path.join(__dirname, "cadastro.html")));
-app.get("/jogo.html", (req, res) => res.sendFile(path.join(__dirname, "jogo.html")));
 
 // --- ROTA DE CADASTRO ---
 app.post("/register", async (req, res) => {
@@ -53,7 +59,7 @@ app.post("/register", async (req, res) => {
         return res.json({ success: true, msg: "Cadastro realizado!" });
     } catch (err) {
         console.error("ERRO NO REGISTER:", err);
-        return res.status(500).json({ success: false, msg: "Erro interno no servidor" });
+        return res.status(500).json({ success: false, msg: "Erro ao salvar no banco." });
     }
 });
 
@@ -61,27 +67,18 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
-        const userClean = username.trim();
-        const usuario = await User.findOne({ username: userClean });
+        const usuario = await User.findOne({ username: username.trim() });
 
         if (!usuario) return res.status(401).json({ success: false, msg: "Usuário não encontrado" });
 
         const senhaValida = await bcrypt.compare(password, usuario.password);
         if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
 
-        return res.json({ 
-            success: true, 
-            saldo: usuario.saldo, 
-            msg: "Login realizado!" 
-        });
+        return res.json({ success: true, saldo: usuario.saldo });
     } catch (err) {
-        console.error("ERRO NO LOGIN:", err);
         return res.status(500).json({ success: false, msg: "Erro no login" });
     }
 });
 
-// --- INICIALIZAÇÃO (AJUSTE PARA RENDER) ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
