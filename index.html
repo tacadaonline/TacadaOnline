@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tacada Online - Login</title>
     <style>
-        /* Fundo e Geral */
+        /* Estilo Geral Profissional */
         body { 
             background-color: #0d0d0d; 
             color: #ffffff; 
@@ -18,17 +18,18 @@
             height: 100vh;
         }
 
-        /* Banner Superior */
+        /* Banner Superior com sua imagem oficial */
         .banner {
             width: 100%;
             max-width: 400px;
-            height: 120px;
-            background: linear-gradient(45deg, #000, #1a1a1a);
-            border: 2px solid #d4af37; /* Cor Dourada */
+            height: 140px;
+            background: #000;
+            border: 2px solid #d4af37;
             border-radius: 15px 15px 0 0;
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
             overflow: hidden;
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
@@ -37,7 +38,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            opacity: 0.7;
+            opacity: 0.8;
         }
 
         .banner h1 {
@@ -45,8 +46,9 @@
             color: #d4af37;
             text-transform: uppercase;
             letter-spacing: 3px;
-            text-shadow: 2px 2px 5px #000;
+            text-shadow: 2px 2px 8px #000;
             margin: 0;
+            font-size: 24px;
         }
 
         /* Container de Login */
@@ -60,12 +62,12 @@
             border-top: none;
             box-sizing: border-box;
             box-shadow: 0 15px 30px rgba(0,0,0,0.8);
+            text-align: center;
         }
 
-        /* Inputs Estilizados */
         input { 
             width: 100%; 
-            padding: 12px; 
+            padding: 14px; 
             margin: 10px 0; 
             background: #262626;
             border: 1px solid #444;
@@ -76,14 +78,10 @@
             box-sizing: border-box;
         }
 
-        input:focus {
-            border-color: #d4af37;
-            outline: none;
-            background: #333;
-        }
+        input:focus { border-color: #d4af37; outline: none; background: #333; }
 
-        /* Botão de Jogar */
-        button { 
+        /* Botão de Login (Dourado) */
+        .btn-login { 
             width: 100%; 
             padding: 15px; 
             margin-top: 10px;
@@ -95,34 +93,52 @@
             font-weight: bold; 
             font-size: 18px;
             text-transform: uppercase;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: 0.2s;
         }
 
-        button:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        /* Botão de Cadastro (Escuro) */
+        .btn-cadastrar {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: #222;
+            color: #d4af37;
+            border: 1px solid #d4af37;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            transition: 0.2s;
         }
 
-        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; }
+        button:hover { transform: scale(1.02); opacity: 0.9; }
+
+        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; }
     </style>
 </head>
 <body>
 
     <div class="banner">
-        <!-- Substitua pelo link da sua logo ou banner oficial -->
-        <img src="https://i.ibb.co/bMQH4hsn/27-CF7-F3-E-937-C-4021-8-EEB-BFF4388-DB157.png" alt="Banner Tacada">
-        <h1></h1>
+        <!-- Seu banner oficial -->
+        <img src="https://i.ibb.co" alt="Banner Tacada">
+        <h1>TACADA ONLINE</h1>
     </div>
 
     <div class="login-container">
         <input type="text" id="user" placeholder="Usuário">
         <input type="password" id="pass" placeholder="Senha">
-        <button onclick="fazerLogin()">Entrar na Partida</button>
+        
+        <button class="btn-login" onclick="fazerLogin()">Entrar na Partida</button>
+        
+        <button class="btn-cadastrar" onclick="window.location.href='cadastro.html'">
+            Criar Nova Conta / Cadastro
+        </button>
+
         <div id="erro"></div>
     </div>
 
     <script>
-        // O script permanece o mesmo que enviamos antes!
         async function fazerLogin() {
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value.trim();
