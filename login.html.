@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Tacada Online</title>
+    <style>
+        body {
+            background: #050505;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-card {
+            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid gold;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+            width: 300px;
+            text-align: center;
+        }
+        h2 { color: gold; margin-bottom: 20px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #222;
+            border: 1px solid #444;
+            color: white;
+            border-radius: 5px;
+            outline: none;
+        }
+        input:focus { border-color: gold; }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: gold;
+            border: none;
+            color: black;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        button:hover { background: #e6c200; transform: scale(1.02); }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>TACADA LOGIN</h2>
+        <input type="text" id="user" placeholder="Usuário">
+        <input type="password" id="pass" placeholder="Senha">
+        <button onclick="fazerLogin()">ENTRAR NO JOGO</button>
+        <p id="erro" style="color: red; font-size: 12px; margin-top: 10px;"></p>
+    </div>
+
+    <script>
+        async function fazerLogin() {
+            const user = document.getElementById('user').value;
+            const pass = document.getElementById('pass').value;
+            const erroEl = document.getElementById('erro');
+
+            // Substitua pela URL que o Render te der
+            const url = 'http://localhost:3000/login'; 
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Salva o saldo e vai para o jogo
+                    localStorage.setItem('saldoInicial', data.saldo);
+                    window.location.href = 'index.html'; 
+                } else {
+                    erroEl.innerText = data.msg;
+                }
+            } catch (e) {
+                erroEl.innerText = "Erro ao conectar com o servidor.";
+            }
+        }
+    </script>
+</body>
+</html>
