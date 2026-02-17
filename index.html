@@ -1,52 +1,75 @@
-<script>
-async function fazerLogin() {
-    const user = document.getElementById('user').value.trim();
-    const pass = document.getElementById('pass').value.trim();
-    const erroEl = document.getElementById('erro');
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Tacada Online</title>
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .login-container { max-width: 300px; margin: 0 auto; padding: 20px; border: 1px solid #333; border-radius: 10px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
+        button { width: 97%; padding: 10px; background: gold; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #erro { margin-top: 15px; font-size: 14px; min-height: 20px; }
+    </style>
+</head>
+<body>
 
-    if (!user || !pass) {
-        erroEl.style.color = "#ff4d4d";
-        erroEl.innerText = "Preencha usuário e senha.";
-        return;
-    }
+    <div class="login-container">
+        <h2>Tacada Online</h2>
+        <input type="text" id="user" placeholder="Usuário">
+        <input type="password" id="pass" placeholder="Senha">
+        <button onclick="fazerLogin()">Entrar</button>
+        <div id="erro"></div>
+    </div>
 
-    const url = "https://tacadaonline-backend.onrender.com/login";
+    <script>
+    async function fazerLogin() {
+        const user = document.getElementById('user').value.trim();
+        const pass = document.getElementById('pass').value.trim();
+        const erroEl = document.getElementById('erro');
 
-    erroEl.style.color = "gold";
-    erroEl.innerText = "Conectando ao servidor...";
-
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 20000);
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: user, password: pass }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeout);
-
-        let data;
-        try {
-            data = await response.json();
-        } catch {
-            throw new Error("Resposta inválida do servidor");
-        }
-
-        if (response.ok && data.success === true) {
-            localStorage.setItem("saldoInicial", data.saldo ?? 0);
-            window.location.href = "jogo.html";
-        } else {
+        if (!user || !pass) {
             erroEl.style.color = "#ff4d4d";
-            erroEl.innerText = data.msg || "Login inválido.";
+            erroEl.innerText = "Preencha usuário e senha.";
+            return;
         }
 
-    } catch (err) {
-        console.error(err);
-        erroEl.style.color = "#ff4d4d";
-        erroEl.innerText = "Não foi possível conectar ao servidor. Tente novamente.";
+        // Alterado para caminho relativo: funciona local e no deploy automaticamente
+        const url = "/login";
+
+        erroEl.style.color = "gold";
+        erroEl.innerText = "Conectando ao servidor...";
+
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 20000);
+
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: user, password: pass }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeout);
+
+            const data = await response.json();
+
+            if (response.ok && data.success === true) {
+                localStorage.setItem("saldoInicial", data.saldo ?? 0);
+                // Redireciona para o jogo
+                window.location.href = "jogo.html";
+            } else {
+                erroEl.style.color = "#ff4d4d";
+                erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
+            }
+
+        } catch (err) {
+            console.error("Erro na requisição:", err);
+            erroEl.style.color = "#ff4d4d";
+            erroEl.innerText = "Erro ao conectar. O servidor está ligado?";
+        }
     }
-}
-</script>
+    </script>
+</body>
+</html>
