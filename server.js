@@ -11,10 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
-// --- CONEXÃO COM O MONGODB (ESTRUTURA REFORÇADA) ---
-const MONGO_URI = "mongodb+srv://joaoprofvitor:qFmbWQW1ckquJ5Ql@cluster0.mavkxio.mongodb.net/?retryWrites=true&w=majority";
+// --- CONEXÃO COM O MONGODB ---
+const MONGO_URI = "mongodb+srv://joaoprofvitor:qFmbWQW1ckquJ5Ql@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
 
-// Conectar ao banco com tratamento de erro global
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ CONEXÃO ESTABELECIDA COM O MONGODB!"))
     .catch(err => console.error("❌ FALHA CRÍTICA NA CONEXÃO:", err));
@@ -23,15 +22,14 @@ mongoose.connect(MONGO_URI)
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
-    saldo: { type: Number, default: 0 }
+    saldo: { type: Number, default: 100 } // Definido saldo inicial de 100 para novos jogadores
 });
 const User = mongoose.model("User", UserSchema);
 
 // --- MIDDLEWARE DE CHECAGEM DE BANCO ---
-// Impede que as rotas rodem se o banco estiver offline
 app.use((req, res, next) => {
     if (mongoose.connection.readyState !== 1) {
-        return res.status(503).json({ success: false, msg: "Banco de dados ainda está conectando... tente em 5 segundos." });
+        return res.status(503).json({ success: false, msg: "Banco de dados conectando..." });
     }
     next();
 });
@@ -39,6 +37,7 @@ app.use((req, res, next) => {
 // --- ROTAS DE PÁGINAS ---
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
 app.get("/cadastro.html", (req, res) => res.sendFile(path.join(__dirname, "cadastro.html")));
+app.get("/jogo.html", (req, res) => res.sendFile(path.join(__dirname, "index.html"))); // Ajustado para seu index
 
 // --- ROTA DE CADASTRO ---
 app.post("/register", async (req, res) => {
@@ -58,7 +57,6 @@ app.post("/register", async (req, res) => {
 
         return res.json({ success: true, msg: "Cadastro realizado!" });
     } catch (err) {
-        console.error("ERRO NO REGISTER:", err);
         return res.status(500).json({ success: false, msg: "Erro ao salvar no banco." });
     }
 });
@@ -74,9 +72,36 @@ app.post("/login", async (req, res) => {
         const senhaValida = await bcrypt.compare(password, usuario.password);
         if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
 
-        return res.json({ success: true, saldo: usuario.saldo });
+        // IMPORTANTE: Enviando saldo para o jogo
+        return res.json({ 
+            success: true, 
+            username: usuario.username, 
+            saldo: usuario.saldo, 
+            msg: "Sucesso!" 
+        });
     } catch (err) {
         return res.status(500).json({ success: false, msg: "Erro no login" });
+    }
+});
+
+// --- ROTA PARA ATUALIZAR SALDO (GANHOS E PERDAS) ---
+app.post("/update-saldo", async (req, res) => {
+    try {
+        const { username, valor } = req.body;
+        
+        // Busca o usuário e incrementa o saldo (valor pode ser positivo ou negativo)
+        const usuario = await User.findOneAndUpdate(
+            { username: username },
+            { $inc: { saldo: valor } },
+            { new: true } // Retorna o documento atualizado
+        );
+
+        if (!usuario) return res.status(404).json({ success: false, msg: "Usuário não encontrado" });
+
+        return res.json({ success: true, novoSaldo: usuario.saldo });
+    } catch (err) {
+        console.error("Erro ao atualizar saldo:", err);
+        return res.status(500).json({ success: false, msg: "Erro no servidor" });
     }
 });
 
