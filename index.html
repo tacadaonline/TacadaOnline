@@ -131,7 +131,7 @@
                     localStorage.setItem("usuario", user);
                     localStorage.setItem("saldo", data.saldo);
                     
-                    window.location.href = "index.html"; // Redireciona para o jogo
+                    window.location.href = "/jogo.html"; // Redireciona para o jogo
                 } else {
                     erroEl.style.color = "#ff4d4d";
                     erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
