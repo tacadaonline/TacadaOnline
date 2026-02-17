@@ -24,7 +24,7 @@
             padding: 35px 25px;
             border-radius: 20px;
             border: 1px solid gold;
-            box-shadow: 0 0 25px rgba(255, 215, 0, 0.15);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.2);
             width: 100%;
             max-width: 350px;
             text-align: center;
@@ -47,7 +47,7 @@
             border: 1px solid #333;
             background: #111;
             color: white;
-            font-size: 16px; /* Essencial para evitar zoom no iPhone */
+            font-size: 16px; /* Evita zoom automático no iPhone */
             box-sizing: border-box;
             outline: none;
         }
@@ -76,10 +76,10 @@
         }
 
         #erro {
-            color: #ff4d4d;
             font-size: 14px;
             margin-top: 15px;
             min-height: 20px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -99,10 +99,10 @@
             const pass = document.getElementById('pass').value;
             const erroEl = document.getElementById('erro');
             
-            // Link corrigido para backend (com 'a')
+            // Link corrigido para 'backend' (com 'a') e sem a porta 3000
             const url = 'https://tacadaonline-backend.onrender.com/login';
 
-            erroEl.innerText = "Conectando...";
+            erroEl.innerText = "Conectando ao servidor...";
             erroEl.style.color = "gold";
 
             try {
@@ -112,20 +112,23 @@
                     body: JSON.stringify({ username: user, password: pass })
                 });
 
+                if (!response.ok) {
+                    throw new Error("Erro na resposta do servidor");
+                }
+
                 const data = await response.json();
 
                 if (data.success) {
-                    // Salva o saldo e redireciona para o jogo
                     localStorage.setItem('saldoInicial', data.saldo);
                     window.location.href = 'jogo.html';
                 } else {
                     erroEl.style.color = "#ff4d4d";
-                    erroEl.innerText = data.msg;
+                    erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
                 }
             } catch (e) {
-                console.error("Erro de conexão:", e);
+                console.error("Erro:", e);
                 erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = "Servidor acordando... tente de novo em alguns segundos.";
+                erroEl.innerText = "Servidor acordando... tente de novo em 10 segundos.";
             }
         }
     </script>
