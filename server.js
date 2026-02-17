@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
 // --- CONEXÃO COM O MONGODB (ESTRUTURA REFORÇADA) ---
-const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/?retryWrites=true&w=majority";
+const MONGO_URI = "mongodb+srv://joaoprofvitor:qFmbWQW1ckquJ5Ql@cluster0.mavkxio.mongodb.net/?retryWrites=true&w=majority";
 
 // Conectar ao banco com tratamento de erro global
 mongoose.connect(MONGO_URI)
