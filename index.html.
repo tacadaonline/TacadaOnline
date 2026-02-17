@@ -80,7 +80,7 @@
                 if (data.success) {
                     // Salva o saldo e vai para o jogo
                     localStorage.setItem('saldoInicial', data.saldo);
-                    window.location.href = 'index.html'; 
+                    window.location.href = 'jogo.html'; 
                 } else {
                     erroEl.innerText = data.msg;
                 }
