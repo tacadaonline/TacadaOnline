@@ -133,9 +133,24 @@ function atualizarLucro() {
 }
 
 async function confirmBet() {
+    // 1. SEGURANÇA: Mantém as verificações que você já tem
     if (state !== "BETTING") return;
-    if (valorAposta <= 0 || saldo < valorAposta) { show("SEM SALDO", "#ff4444"); return; }
+    if (valorAposta <= 0 || saldo < valorAposta) { 
+        show("SEM SALDO", "#ff4444"); 
+        return; 
+    }
+
+    // 2. NOVIDADE: Adiciona a busca do RTP do Painel Admin aqui
+    try {
+        const rtpRes = await fetch("/admin/get-rtp");
+        const rtpData = await rtpRes.json();
+        dificuldadeRTP = rtpData.rtp; // Agora o jogo obedece o seu painel!
+        console.log("Dificuldade atualizada pelo admin:", dificuldadeRTP);
+    } catch (e) {
+        dificuldadeRTP = 0.95; // Se o servidor falhar, usa o padrão justo
+    }
     
+    // 3. CONTINUAÇÃO: O resto do seu código original
     lockedBet = valorAposta;
     state = "PLAYING";
     await atualizarSaldoNoBanco(-lockedBet); // Desconta aposta
