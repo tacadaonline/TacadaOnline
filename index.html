@@ -281,6 +281,7 @@ function finish(win, msg) {
         let retornoTotal = lockedBet * 2.4;
 
         saldo += retornoTotal;
+     let lucroreal = retornoTotal - lockedBet;
 
         show(`GREEN +R$ ${lockedBet.toFixed(2)}`, "gold");
     } else {
