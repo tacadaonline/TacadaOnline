@@ -31,13 +31,7 @@
             box-sizing: border-box;
         }
 
-        h2 {
-            color: gold;
-            margin-bottom: 25px;
-            font-size: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
+        h2 { color: gold; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; }
 
         input {
             width: 100%;
@@ -47,13 +41,9 @@
             border: 1px solid #333;
             background: #111;
             color: white;
-            font-size: 16px; /* Evita zoom automático no iPhone */
+            font-size: 16px;
             box-sizing: border-box;
             outline: none;
-        }
-
-        input:focus {
-            border-color: gold;
         }
 
         button {
@@ -67,20 +57,10 @@
             font-size: 16px;
             cursor: pointer;
             margin-top: 15px;
-            transition: 0.3s;
             text-transform: uppercase;
         }
 
-        button:active {
-            transform: scale(0.97);
-        }
-
-        #erro {
-            font-size: 14px;
-            margin-top: 15px;
-            min-height: 20px;
-            font-weight: bold;
-        }
+        #erro { font-size: 14px; margin-top: 15px; font-weight: bold; min-height: 20px; }
     </style>
 </head>
 <body>
@@ -99,10 +79,10 @@
             const pass = document.getElementById('pass').value;
             const erroEl = document.getElementById('erro');
             
-            // Link corrigido para 'backend' (com 'a') e sem a porta 3000
+            // LINK CORRIGIDO: 'backend' com 'a' e sem porta 3000
             const url = 'https://tacadaonline-backend.onrender.com/login';
 
-            erroEl.innerText = "Conectando ao servidor...";
+            erroEl.innerText = "Conectando...";
             erroEl.style.color = "gold";
 
             try {
@@ -112,10 +92,6 @@
                     body: JSON.stringify({ username: user, password: pass })
                 });
 
-                if (!response.ok) {
-                    throw new Error("Erro na resposta do servidor");
-                }
-
                 const data = await response.json();
 
                 if (data.success) {
@@ -123,12 +99,12 @@
                     window.location.href = 'jogo.html';
                 } else {
                     erroEl.style.color = "#ff4d4d";
-                    erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
+                    erroEl.innerText = data.msg;
                 }
             } catch (e) {
-                console.error("Erro:", e);
+                console.error(e);
                 erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = "Servidor acordando... tente de novo em 10 segundos.";
+                erroEl.innerText = "Erro: Servidor acordando. Tente de novo em 10 segundos.";
             }
         }
     </script>
