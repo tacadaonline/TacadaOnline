@@ -3,73 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Tacada Online</title>
+    <title>Tacada Online - Login</title>
     <style>
-        body { background: #121212; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        .login-container { max-width: 300px; margin: 0 auto; padding: 20px; border: 1px solid #333; border-radius: 10px; }
-        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
-        button { width: 97%; padding: 10px; background: gold; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #erro { margin-top: 15px; font-size: 14px; min-height: 20px; }
+        /* Fundo e Geral */
+        body { 
+            background-color: #0d0d0d; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        /* Banner Superior */
+        .banner {
+            width: 100%;
+            max-width: 400px;
+            height: 120px;
+            background: linear-gradient(45deg, #000, #1a1a1a);
+            border: 2px solid #d4af37; /* Cor Dourada */
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.7;
+        }
+
+        .banner h1 {
+            position: absolute;
+            color: #d4af37;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 2px 2px 5px #000;
+            margin: 0;
+        }
+
+        /* Container de Login */
+        .login-container { 
+            width: 90%;
+            max-width: 400px;
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 0 0 15px 15px;
+            border: 2px solid #d4af37;
+            border-top: none;
+            box-sizing: border-box;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.8);
+        }
+
+        /* Inputs Estilizados */
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: #262626;
+            border: 1px solid #444;
+            border-radius: 8px; 
+            color: white;
+            font-size: 16px;
+            transition: 0.3s;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            border-color: #d4af37;
+            outline: none;
+            background: #333;
+        }
+
+        /* Botão de Jogar */
+        button { 
+            width: 100%; 
+            padding: 15px; 
+            margin-top: 10px;
+            background: linear-gradient(to right, #d4af37, #f2d06b);
+            color: #000;
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 18px;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
 
+    <div class="banner">
+        <!-- Substitua pelo link da sua logo ou banner oficial -->
+        <img src="https://images.unsplash.com" alt="Banner Tacada">
+        <h1>TACADA</h1>
+    </div>
+
     <div class="login-container">
-        <h2>Tacada Online</h2>
         <input type="text" id="user" placeholder="Usuário">
         <input type="password" id="pass" placeholder="Senha">
-        <button onclick="fazerLogin()">Entrar</button>
+        <button onclick="fazerLogin()">Entrar na Partida</button>
         <div id="erro"></div>
     </div>
 
     <script>
-    async function fazerLogin() {
-        const user = document.getElementById('user').value.trim();
-        const pass = document.getElementById('pass').value.trim();
-        const erroEl = document.getElementById('erro');
+        // O script permanece o mesmo que enviamos antes!
+        async function fazerLogin() {
+            const user = document.getElementById('user').value.trim();
+            const pass = document.getElementById('pass').value.trim();
+            const erroEl = document.getElementById('erro');
 
-        if (!user || !pass) {
-            erroEl.style.color = "#ff4d4d";
-            erroEl.innerText = "Preencha usuário e senha.";
-            return;
-        }
-
-        // Alterado para caminho relativo: funciona local e no deploy automaticamente
-        const url = "/login";
-
-        erroEl.style.color = "gold";
-        erroEl.innerText = "Conectando ao servidor...";
-
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 20000);
-
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: user, password: pass }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeout);
-
-            const data = await response.json();
-
-            if (response.ok && data.success === true) {
-                localStorage.setItem("saldoInicial", data.saldo ?? 0);
-                // Redireciona para o jogo
-                window.location.href = "jogo.html";
-            } else {
+            if (!user || !pass) {
                 erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
+                erroEl.innerText = "Campos obrigatórios!";
+                return;
             }
 
-        } catch (err) {
-            console.error("Erro na requisição:", err);
-            erroEl.style.color = "#ff4d4d";
-            erroEl.innerText = "Erro ao conectar. O servidor está ligado?";
+            const url = "/login";
+            erroEl.style.color = "#d4af37";
+            erroEl.innerText = "Conectando...";
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    localStorage.setItem("saldoInicial", data.saldo ?? 0);
+                    window.location.href = "jogo.html";
+                } else {
+                    erroEl.style.color = "#ff4d4d";
+                    erroEl.innerText = data.msg || "Dados inválidos.";
+                }
+            } catch (err) {
+                erroEl.style.color = "#ff4d4d";
+                erroEl.innerText = "Erro de conexão!";
+            }
         }
-    }
     </script>
 </body>
 </html>
