@@ -2,102 +2,96 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Login - Tacada Online</title>
     <style>
-      body {
-    background: #050505;
-    color: white;
-    font-family: 'Segoe UI', sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-    overflow: hidden; /* Evita rolagens desnecessárias */
-    padding: 20px; /* Margem de segurança para telas pequenas */
-    box-sizing: border-box;
-}
+        body {
+            background: #050505;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Evita que a tela suba ou desça no celular */
+            padding: 20px;
+            box-sizing: border-box;
+        }
 
-.login-card {
-    background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-    padding: clamp(20px, 5vw, 40px); /* Padding que diminui em telas menores */
-    border-radius: 15px;
-    border: 1px solid gold;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
-    width: 100%;
-    max-width: 350px; /* Não deixa ficar gigante no PC */
-    text-align: center;
-}
-
-input {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border-radius: 5px;
-    border: 1px solid #333;
-    background: #222;
-    color: white;
-    box-sizing: border-box; /* Garante que o padding não "estoure" a largura */
-}
-
-button {
-    width: 100%;
-    padding: 12px;
-    background: gold;
-    border: none;
-    border-radius: 5px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 10px;
-    transition: transform 0.2s; /* Efeito de clique */
-}
-
-button:active {
-    transform: scale(0.98); /* Feedback visual de toque no celular */
-}
         .login-card {
             background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-            padding: 40px;
-            border-radius: 15px;
+            padding: 35px 25px;
+            border-radius: 20px;
             border: 1px solid gold;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
-            width: 300px;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.15);
+            width: 100%;
+            max-width: 350px; /* Tamanho ideal para parecer um App */
             text-align: center;
+            box-sizing: border-box;
         }
-        h2 { color: gold; margin-bottom: 20px; }
+
+        h2 {
+            color: gold;
+            margin-bottom: 25px;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
         input {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             margin: 10px 0;
-            background: #222;
-            border: 1px solid #444;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #111;
             color: white;
-            border-radius: 5px;
+            font-size: 16px; /* Evita que o iPhone dê zoom automático */
+            box-sizing: border-box;
             outline: none;
         }
-        input:focus { border-color: gold; }
+
+        input:focus {
+            border-color: gold;
+        }
+
         button {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             background: gold;
-            border: none;
             color: black;
+            border: none;
+            border-radius: 8px;
             font-weight: bold;
-            border-radius: 5px;
+            font-size: 16px;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 15px;
             transition: 0.3s;
+            text-transform: uppercase;
         }
-        button:hover { background: #e6c200; transform: scale(1.02); }
+
+        button:active {
+            transform: scale(0.97);
+            background: #e6c300;
+        }
+
+        #erro {
+            color: #ff4d4d;
+            font-size: 14px;
+            margin-top: 15px;
+            min-height: 20px;
+        }
     </style>
 </head>
 <body>
+
     <div class="login-card">
-        <h2>TACADA LOGIN</h2>
+        <h2>Tacada Login</h2>
         <input type="text" id="user" placeholder="Usuário">
         <input type="password" id="pass" placeholder="Senha">
-        <button onclick="fazerLogin()">ENTRAR NO JOGO</button>
-        <p id="erro" style="color: red; font-size: 12px; margin-top: 10px;"></p>
+        <button onclick="fazerLogin()">Entrar no Jogo</button>
+        <p id="erro"></p>
     </div>
 
     <script>
@@ -105,9 +99,9 @@ button:active {
             const user = document.getElementById('user').value;
             const pass = document.getElementById('pass').value;
             const erroEl = document.getElementById('erro');
-
-            // Substitua pela URL que o Render te der
-            const url = 'https://tacadaonline-backend.onrender.com/login'; 
+            
+            // Sua URL oficial do Backend no Render
+            const url = 'https://tacadaonline-backend.onrender.com/login';
 
             try {
                 const response = await fetch(url, {
@@ -119,9 +113,10 @@ button:active {
                 const data = await response.json();
 
                 if (data.success) {
-                    // Salva o saldo e vai para o jogo
+                    // Salva o saldo vindo do servidor para o jogo usar
                     localStorage.setItem('saldoInicial', data.saldo);
-                    window.location.href = 'jogo.html'; 
+                    // MANDA PARA O ARQUIVO DO JOGO
+                    window.location.href = 'jogo.html';
                 } else {
                     erroEl.innerText = data.msg;
                 }
