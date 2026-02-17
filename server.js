@@ -7,7 +7,7 @@ app.use(express.json());
 
 // Banco de dados temporário (Simulado)
 const usuarios = [
-    { user: "admin", pass: "123", saldo: 1000.00 }
+    { user: "admin", pass: "12345", saldo: 1000.00 }
 ];
 
 // Rota de Login
