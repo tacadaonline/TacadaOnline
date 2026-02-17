@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
 // --- CONEXÃO COM O MONGODB ---
-const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
+const MONGO_URI = "mongodb+srv://joaoprofvitor:maeteamo123@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 5000 // Desiste após 5s se o banco não responder
