@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>TACADA - PAINEL CONTROLE</title>
+    <style>
+        body { background: #000; color: gold; font-family: sans-serif; text-align: center; padding: 50px; }
+        .card { background: #111; padding: 30px; border: 2px solid gold; border-radius: 15px; display: inline-block; }
+        input { padding: 12px; margin: 10px; width: 80%; background: #222; border: 1px solid gold; color: #fff; border-radius: 5px; }
+        button { padding: 15px 30px; background: gold; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>CONTROLE DE RTP</h2>
+        <p>0.9 = Ganha Fácil | 0.2 = Ganha Difícil</p>
+        <input type="number" id="v" step="0.1" placeholder="Valor RTP (Ex: 0.5)">
+        <input type="password" id="s" placeholder="Senha do Painel">
+        <br>
+        <button onclick="salvar()">ATUALIZAR DIFICULDADE</button>
+    </div>
+    <script>
+        async function salvar() {
+            const res = await fetch("/admin/set-rtp", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ novoRTP: document.getElementById("v").value, senha: document.getElementById("s").value })
+            });
+            const data = await res.json();
+            alert(data.success ? "DIFICULDADE ALTERADA!" : "ERRO!");
+        }
+    </script>
+</body>
+</html>
