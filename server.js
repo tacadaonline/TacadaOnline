@@ -1,46 +1,70 @@
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
+
 const app = express();
 
-// Configuração de CORS completa para evitar bloqueios no navegador
+/* ===============================
+   CONFIGURAÇÕES GERAIS
+================================ */
 app.use(cors({
-    origin: '*', 
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    origin: "*",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"]
 }));
 
 app.use(express.json());
 
-// Banco de dados temporário
+/* ===============================
+   BANCO DE DADOS TEMPORÁRIO
+================================ */
 const usuarios = [
-    { user: "admin", pass: "123", saldo: 1000.00 }
+    { user: "admin", pass: "123", saldo: 1000 }
 ];
 
-// Rota inicial para teste (Agora não vai mais dar "Cannot GET /")
-app.get('/', (req, res) => {
-    res.send('Servidor do Tacada Online está ATIVO e operando!');
+/* ===============================
+   ROTA DE TESTE
+================================ */
+app.get("/", (req, res) => {
+    res.json({
+        status: "online",
+        msg: "Servidor do Tacada Online está ATIVO"
+    });
 });
 
-// Rota de Login
-app.post('/login', (req, res) => {
+/* ===============================
+   ROTA DE LOGIN
+================================ */
+app.post("/login", (req, res) => {
     const { username, password } = req.body;
-    const usuario = usuarios.find(u => u.user === username && u.pass === password);
 
-    if (usuario) {
-        res.json({ 
-            success: true, 
-            saldo: usuario.saldo, 
-            msg: "Bem-vindo ao jogo!" 
-        });
-    } else {
-        res.status(401).json({ 
-            success: false, 
-            msg: "Usuário ou senha incorretos." 
+    if (!username || !password) {
+        return res.status(400).json({
+            success: false,
+            msg: "Usuário e senha são obrigatórios"
         });
     }
+
+    const usuario = usuarios.find(
+        u => u.user === username && u.pass === password
+    );
+
+    if (!usuario) {
+        return res.status(401).json({
+            success: false,
+            msg: "Usuário ou senha incorretos"
+        });
+    }
+
+    res.json({
+        success: true,
+        saldo: usuario.saldo,
+        msg: "Login realizado com sucesso"
+    });
 });
 
-// Porta dinâmica para o Render
+/* ===============================
+   START DO SERVIDOR (RENDER)
+================================ */
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
