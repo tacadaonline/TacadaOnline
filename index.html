@@ -4,16 +4,57 @@
     <meta charset="UTF-8">
     <title>Login - Tacada Online</title>
     <style>
-        body {
-            background: #050505;
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
+      body {
+    background: #050505;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden; /* Evita rolagens desnecessárias */
+    padding: 20px; /* Margem de segurança para telas pequenas */
+    box-sizing: border-box;
+}
+
+.login-card {
+    background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+    padding: clamp(20px, 5vw, 40px); /* Padding que diminui em telas menores */
+    border-radius: 15px;
+    border: 1px solid gold;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+    width: 100%;
+    max-width: 350px; /* Não deixa ficar gigante no PC */
+    text-align: center;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background: #222;
+    color: white;
+    box-sizing: border-box; /* Garante que o padding não "estoure" a largura */
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: gold;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: transform 0.2s; /* Efeito de clique */
+}
+
+button:active {
+    transform: scale(0.98); /* Feedback visual de toque no celular */
+}
         .login-card {
             background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
             padding: 40px;
