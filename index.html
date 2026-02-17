@@ -1,112 +1,52 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Login - Tacada Online</title>
-    <style>
-        body {
-            background: #050505;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            padding: 20px;
-            box-sizing: border-box;
+<script>
+async function fazerLogin() {
+    const user = document.getElementById('user').value.trim();
+    const pass = document.getElementById('pass').value.trim();
+    const erroEl = document.getElementById('erro');
+
+    if (!user || !pass) {
+        erroEl.style.color = "#ff4d4d";
+        erroEl.innerText = "Preencha usuário e senha.";
+        return;
+    }
+
+    const url = "https://tacadaonline-backend.onrender.com/login";
+
+    erroEl.style.color = "gold";
+    erroEl.innerText = "Conectando ao servidor...";
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20000);
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: user, password: pass }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        let data;
+        try {
+            data = await response.json();
+        } catch {
+            throw new Error("Resposta inválida do servidor");
         }
 
-        .login-card {
-            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-            padding: 35px 25px;
-            border-radius: 20px;
-            border: 1px solid gold;
-            box-shadow: 0 0 25px rgba(255, 215, 0, 0.2);
-            width: 100%;
-            max-width: 350px;
-            text-align: center;
-            box-sizing: border-box;
+        if (response.ok && data.success === true) {
+            localStorage.setItem("saldoInicial", data.saldo ?? 0);
+            window.location.href = "jogo.html";
+        } else {
+            erroEl.style.color = "#ff4d4d";
+            erroEl.innerText = data.msg || "Login inválido.";
         }
 
-        h2 { color: gold; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; }
-
-        input {
-            width: 100%;
-            padding: 14px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: 1px solid #333;
-            background: #111;
-            color: white;
-            font-size: 16px;
-            box-sizing: border-box;
-            outline: none;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            background: gold;
-            color: black;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 15px;
-            text-transform: uppercase;
-        }
-
-        #erro { font-size: 14px; margin-top: 15px; font-weight: bold; min-height: 20px; }
-    </style>
-</head>
-<body>
-
-    <div class="login-card">
-        <h2>Tacada Login</h2>
-        <input type="text" id="user" placeholder="Usuário">
-        <input type="password" id="pass" placeholder="Senha">
-        <button onclick="fazerLogin()">Entrar no Jogo</button>
-        <p id="erro"></p>
-    </div>
-
-    <script>
-        async function fazerLogin() {
-            const user = document.getElementById('user').value;
-            const pass = document.getElementById('pass').value;
-            const erroEl = document.getElementById('erro');
-            
-            // LINK CORRIGIDO: 'backend' com 'a' e sem porta 3000
-            const url = 'https://tacadaonline-backend.onrender.com/login';
-
-            erroEl.innerText = "Conectando...";
-            erroEl.style.color = "gold";
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    localStorage.setItem('saldoInicial', data.saldo);
-                    window.location.href = 'jogo.html';
-                } else {
-                    erroEl.style.color = "#ff4d4d";
-                    erroEl.innerText = data.msg;
-                }
-            } catch (e) {
-                console.error(e);
-                erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = "Erro: Servidor acordando. Tente de novo em 10 segundos.";
-            }
-        }
-    </script>
-</body>
-</html>
+    } catch (err) {
+        console.error(err);
+        erroEl.style.color = "#ff4d4d";
+        erroEl.innerText = "Não foi possível conectar ao servidor. Tente novamente.";
+    }
+}
+</script>
