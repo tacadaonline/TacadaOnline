@@ -95,41 +95,35 @@ function sortearPosicoes() {
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // --- DESENHO DA CAÇAPA (BURACO) ---
+    // CAÇAPA (BURACO) - CORRIGIDO
     ctx.save();
-    // Brilho para destacar
     ctx.shadowBlur = 15;
-    ctx.shadowColor = "gold";
+    ctx.shadowColor = "rgba(0,0,0,1)";
     
-    // Borda dourada (Aro da caçapa)
+    // Borda da caçapa
     ctx.strokeStyle = "gold"; 
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Fundo do buraco (Preto absoluto agora!)
-    ctx.fillStyle = "#000000"; 
-    ctx.shadowBlur = 0; // Remove brilho de dentro do buraco
+    // Fundo da caçapa (Agora realmente PRETO)
+    ctx.fillStyle = "#000"; 
     ctx.beginPath();
     ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // --- BOLA BRANCA ---
+    // BOLA BRANCA
     ctx.fillStyle = "#fff";
-    ctx.beginPath(); 
-    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
 
-    // --- BOLA DOURADA COM BRILHO ---
+    // BOLA DOURADA
     ctx.save();
     ctx.shadowBlur = 10;
     ctx.shadowColor = "gold";
     ctx.fillStyle = "gold";
-    ctx.beginPath(); 
-    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 }
 
