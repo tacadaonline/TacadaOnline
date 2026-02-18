@@ -25,10 +25,10 @@
   .btn-dep { background: #ffd700; color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
   .btn-saq { background: #2979ff; color: #fff; }
 
-  #canvas-container { position: relative; display: inline-block; }
-  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: block; }
+  #canvas-container { position: relative; display: inline-block; margin-top: 10px; }
+  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: block; cursor: crosshair; }
   
-  #crosshair { position: absolute; width: 30px; height: 30px; pointer-events: none; display: none; z-index: 10; }
+  #crosshair { position: fixed; width: 40px; height: 40px; pointer-events: none; display: none; z-index: 100; top: 0; left: 0; }
 
   .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
   .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
@@ -59,20 +59,21 @@
 
 <div id="canvas-container">
   <canvas id="game"></canvas>
-  <svg id="crosshair" viewBox="0 0 30 30">
-    <!-- Círculo externo -->
-    <circle cx="15" cy="15" r="12" fill="none" stroke="#FFD700" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    <!-- Círculo interno -->
-    <circle cx="15" cy="15" r="6" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <!-- Ponto central -->
-    <circle cx="15" cy="15" r="2" fill="#FFD700" opacity="0.9"/>
-    <!-- Linhas de mira -->
-    <line x1="15" y1="3" x2="15" y2="8" stroke="#FFD700" stroke-width="1" opacity="0.7"/>
-    <line x1="15" y1="22" x2="15" y2="27" stroke="#FFD700" stroke-width="1" opacity="0.7"/>
-    <line x1="3" y1="15" x2="8" y2="15" stroke="#FFD700" stroke-width="1" opacity="0.7"/>
-    <line x1="22" y1="15" x2="27" y2="15" stroke="#FFD700" stroke-width="1" opacity="0.7"/>
-  </svg>
 </div>
+
+<svg id="crosshair" viewBox="0 0 40 40">
+  <!-- Círculo externo -->
+  <circle cx="20" cy="20" r="15" fill="none" stroke="#FFD700" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.9"/>
+  <!-- Círculo interno -->
+  <circle cx="20" cy="20" r="8" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>
+  <!-- Ponto central grande -->
+  <circle cx="20" cy="20" r="3" fill="#FFD700" opacity="1"/>
+  <!-- Linhas de mira -->
+  <line x1="20" y1="2" x2="20" y2="9" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
+  <line x1="20" y1="31" x2="20" y2="38" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
+  <line x1="2" y1="20" x2="9" y2="20" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
+  <line x1="31" y1="20" x2="38" y2="20" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
+</svg>
 
 <div id="modalFinanceiro" class="modal">
   <div class="modal-content">
@@ -87,15 +88,17 @@ let valorAposta = 10;
 let dificuldadeRTP = 0.95;
 let jogoAtivo = false;
 let apostando = false;
+let bolaMovida = false;
 let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
-let atrito = 0.98;
+let atrito = 0.995; // ✅ Atrito reduzido para bolas não pararem rápido
 let gameLoopRunning = false;
+let tempoJogo = 0;
+let maxTempoJogo = 30; // 30 segundos máximo
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const crosshair = document.getElementById("crosshair");
-const canvasContainer = document.getElementById("canvas-container");
 
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
@@ -127,7 +130,9 @@ function sortearPosicoes() {
 
     velocidadeBranca = { x: 0, y: 0 };
     velocidadeDourada = { x: 0, y: 0 };
+    bolaMovida = false;
     jogoAtivo = false;
+    tempoJogo = 0;
     
     desenhar();
 }
@@ -136,21 +141,18 @@ function sortearPosicoes() {
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Desenhar CAÇAPA (bem visível!)
-    // Sombra da caçapa
+    // Desenhar CAÇAPA
     ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
     ctx.beginPath();
     ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
     ctx.fill();
     
-    // Borda externa da caçapa
     ctx.strokeStyle = "#FF8C00";
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Borda interna da caçapa
     ctx.strokeStyle = "#FFD700";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -167,6 +169,12 @@ function desenhar() {
     ctx.lineWidth = 1;
     ctx.stroke();
     
+    // Brilho na bola branca
+    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.beginPath();
+    ctx.arc(branca.x - 3, branca.y - 3, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
     // Desenhar bola dourada
     ctx.fillStyle = "#FFD700"; 
     ctx.beginPath(); 
@@ -177,21 +185,18 @@ function desenhar() {
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Brilho nas bolas
+    // Brilho na bola dourada
     ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
     ctx.beginPath();
-    ctx.arc(branca.x - 2, branca.y - 2, 2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
-    ctx.beginPath();
-    ctx.arc(dourada.x - 2, dourada.y - 2, 2, 0, Math.PI * 2);
+    ctx.arc(dourada.x - 3, dourada.y - 3, 3, 0, Math.PI * 2);
     ctx.fill();
 }
 
 /* ===== PHYSICS DO JOGO =====*/
 function atualizarFisica() {
     if (!jogoAtivo) return;
+
+    tempoJogo += 1/60; // Incrementa tempo
 
     // Aplicar atrito
     velocidadeBranca.x *= atrito;
@@ -247,10 +252,9 @@ function atualizarFisica() {
     const dx = dourada.x - branca.x;
     const dy = dourada.y - branca.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = branca.r + dourada.r + 2; // ✅ Adiciona espaço mínimo
+    const minDist = branca.r + dourada.r + 2;
     
     if (dist < minDist && dist > 0) {
-        // Separa as bolas para evitar colar
         const overlap = minDist - dist;
         const ux = dx / dist;
         const uy = dy / dist;
@@ -260,7 +264,6 @@ function atualizarFisica() {
         dourada.x += (ux * overlap * 0.5);
         dourada.y += (uy * overlap * 0.5);
         
-        // Transfere movimento
         const vx1 = velocidadeBranca.x;
         const vy1 = velocidadeBranca.y;
         const vx2 = velocidadeDourada.x;
@@ -279,60 +282,74 @@ function atualizarFisica() {
         }
     }
 
-    // Verificar se bola dourada entrou na caçapa
+    // ✅ Verificar se bola dourada entrou na caçapa
     const dxHole = hole.x - dourada.x;
     const dyHole = hole.y - dourada.y;
     const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
     if (distHole < hole.r) {
         finalizarJogo(true); // GANHOU!
+        return;
     }
 
-    // Parar jogo se velocidade muito baixa
+    // ✅ Parar jogo apenas se bola foi movida E velocidade muito baixa
     const velocidade = Math.sqrt(velocidadeBranca.x ** 2 + velocidadeBranca.y ** 2);
-    if (velocidade < 0.03) {
+    
+    if (bolaMovida && velocidade < 0.2) {
         velocidadeBranca.x = 0;
         velocidadeBranca.y = 0;
+        velocidadeDourada.x = 0;
+        velocidadeDourada.y = 0;
         jogoAtivo = false;
         console.log("Jogo parou - velocidade baixa");
+        
         setTimeout(() => {
             if (apostando && !jogoAtivo) {
                 finalizarJogo(false); // PERDEU
             }
-        }, 1500);
+        }, 1000);
+        return;
+    }
+
+    // ✅ Timeout se passar 30 segundos
+    if (tempoJogo > maxTempoJogo) {
+        jogoAtivo = false;
+        finalizarJogo(false);
+        return;
     }
 
     desenhar();
 }
 
 /* ===== MOVER MIRA =====*/
-canvas.addEventListener("mousemove", (e) => {
-    if (!jogoAtivo) return;
+document.addEventListener("mousemove", (e) => {
+    if (!jogoAtivo) {
+        crosshair.style.display = "none";
+        return;
+    }
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = e.clientX;
+    const y = e.clientY;
     
-    crosshair.style.display = "block";
-    crosshair.style.left = (x - 15) + "px";
-    crosshair.style.top = (y - 15) + "px";
+    // Verifica se mouse está sobre o canvas
+    if (e.clientX >= rect.left && e.clientX <= rect.right &&
+        e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        crosshair.style.display = "block";
+        crosshair.style.left = (x - 20) + "px";
+        crosshair.style.top = (y - 20) + "px";
+    } else {
+        crosshair.style.display = "none";
+    }
 });
 
-canvas.addEventListener("touchmove", (e) => {
+document.addEventListener("touchmove", (e) => {
     if (!jogoAtivo) return;
     
     const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    
     crosshair.style.display = "block";
-    crosshair.style.left = (x - 15) + "px";
-    crosshair.style.top = (y - 15) + "px";
-});
-
-canvas.addEventListener("mouseleave", () => {
-    crosshair.style.display = "none";
+    crosshair.style.left = (touch.clientX - 20) + "px";
+    crosshair.style.top = (touch.clientY - 20) + "px";
 });
 
 /* ===== TOQUE NA TELA =====*/
@@ -367,10 +384,11 @@ function aplicarForce(x, y) {
     const forceY = y - branca.y;
     const dist = Math.sqrt(forceX * forceX + forceY * forceY);
 
-    if (dist > 0 && dist < 200) {
-        const force = 18;
+    if (dist > 0 && dist < 250) {
+        const force = 20; // ✅ Força aumentada
         velocidadeBranca.x = (forceX / dist) * force;
         velocidadeBranca.y = (forceY / dist) * force;
+        bolaMovida = true; // ✅ Marca que bola foi movida
         console.log("Força aplicada:", velocidadeBranca);
     }
 }
