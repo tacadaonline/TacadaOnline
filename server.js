@@ -26,13 +26,13 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 },
-    depositoInicial: { type: Number, default: 0 } // Base para a regra do dobro
+    depositoInicial: { type: Number, default: 0 } 
 });
 const User = mongoose.model("User", UserSchema);
 
 // --- MIDDLEWARE DE CHECAGEM DE BANCO ---
 app.use((req, res, next) => {
-    if (mongoose.connection.readyState !== 1) {
+    if (mongoose.connection.readyState !== 1 && req.path !== "/admin/get-rtp") {
         return res.status(503).json({ success: false, msg: "Banco de dados conectando..." });
     }
     next();
@@ -47,7 +47,6 @@ app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "admin.html"))
 
 // --- ROTAS DO PAINEL ADMIN ---
 
-// 1. Alterar Dificuldade
 app.post("/admin/set-rtp", (req, res) => {
     const { novoRTP, senha } = req.body;
     if (senha === "12345") { 
@@ -57,12 +56,10 @@ app.post("/admin/set-rtp", (req, res) => {
     res.status(403).json({ success: false, msg: "Senha incorreta" });
 });
 
-// 2. Consultar Dificuldade (Usado pelo Jogo)
 app.get("/admin/get-rtp", (req, res) => {
     res.json({ rtp: globalRTP });
 });
 
-// 3. Listar Jogadores
 app.post("/admin/usuarios", async (req, res) => {
     const { senha } = req.body;
     if (senha === "12345") {
@@ -72,7 +69,6 @@ app.post("/admin/usuarios", async (req, res) => {
     res.status(403).json({ success: false });
 });
 
-// 4. ADICIONAR SALDO (E definir meta de saque)
 app.post("/admin/add-saldo", async (req, res) => {
     const { username, valor, senha } = req.body;
     if (senha === "12345") {
@@ -91,7 +87,6 @@ app.post("/admin/add-saldo", async (req, res) => {
     res.status(403).json({ success: false });
 });
 
-// 5. Zerar Saldo (Saque Pago)
 app.post("/admin/pagar-saque", async (req, res) => {
     const { username, senha } = req.body;
     if (senha === "12345") {
@@ -103,26 +98,61 @@ app.post("/admin/pagar-saque", async (req, res) => {
 
 // --- ROTAS DO JOGADOR ---
 
+// CADASTRO CORRIGIDO (COM TRATAMENTO DE ERRO DETALHADO)
 app.post("/register", async (req, res) => {
     try {
         const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ success: false, msg: "Preencha todos os campos!" });
+        }
+
+        const userClean = username.trim();
+        const existe = await User.findOne({ username: userClean });
+        
+        if (existe) {
+            return res.status(400).json({ success: false, msg: "Este usuário já existe!" });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const novoUsuario = new User({ username: username.trim(), password: hashedPassword });
+
+        const novoUsuario = new User({ 
+            username: userClean, 
+            password: hashedPassword,
+            saldo: 0,
+            depositoInicial: 0
+        });
+
         await novoUsuario.save();
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
+        console.log(`✅ Usuário criado com sucesso: ${userClean}`);
+        return res.json({ success: true, msg: "Cadastro realizado!" });
+
+    } catch (err) {
+        console.error("❌ ERRO NO CADASTRO:", err);
+        return res.status(500).json({ success: false, msg: "Erro interno no servidor." });
+    }
 });
 
 app.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
         const usuario = await User.findOne({ username: username.trim() });
-        if (!usuario) return res.status(401).json({ success: false, msg: "Não encontrado" });
+        if (!usuario) return res.status(401).json({ success: false, msg: "Usuário não encontrado" });
+        
         const senhaValida = await bcrypt.compare(password, usuario.password);
         if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
-        return res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
-    } catch (err) { res.status(500).json({ success: false }); }
+        
+        return res.json({ 
+            success: true, 
+            username: usuario.username, 
+            saldo: usuario.saldo,
+            msg: "Login realizado!" 
+        });
+    } catch (err) { 
+        console.error("❌ ERRO NO LOGIN:", err);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 app.post("/update-saldo", async (req, res) => {
@@ -134,7 +164,10 @@ app.post("/update-saldo", async (req, res) => {
             { new: true }
         );
         res.json({ success: true, novoSaldo: usuario.saldo });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) { 
+        console.error("❌ ERRO AO ATUALIZAR SALDO:", err);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 const PORT = process.env.PORT || 10000;
