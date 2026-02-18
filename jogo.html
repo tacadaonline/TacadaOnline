@@ -66,45 +66,25 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
- // FUNÇÃO PARA BUSCAR SALDO REAL NO SERVIDOR
-async function atualizarSaldoVisual() {
-    const user = localStorage.getItem("usuario"); 
-    if (!user) return;
-    
-    try {
-        const res = await fetch(`/get-saldo/${user}`);
-        const data = await res.json();
-        if (data.success) {
-            // Atualiza o texto na tela. O ID deve ser "saldo"
-            const el = document.getElementById("saldo");
-            if(el) el.innerText = `R$ ${data.saldo.toFixed(2)}`;
-        }
-    } catch (err) {
-        console.error("Erro ao sincronizar saldo");
-    }
-}
-
-// ATUALIZAÇÃO AUTOMÁTICA (OPCIONAL: busca a cada 5 segundos)
-setInterval(atualizarSaldoVisual, 5000);
-
+// --- ESTADO DO JOGO ---
 let usuarioLogado = localStorage.getItem("usuario") || "jogador";
 let valorAposta = 10;
 let dificuldadeRTP = 0.95; 
+let apostaConfirmada = false; // TRAVA DE SEGURANÇA
 
 let branca = { x: 0, y: 0, r: 8, vx: 0, vy: 0 };
 let dourada = { x: 0, y: 0, r: 8, vx: 0, vy: 0 };
-let hole = { x: 0, y: 0, r: 8 };
+let hole = { x: 0, y: 0, r: 12 };
 let mouse = { x: 0, y: 0, down: false };
 
+// --- FUNÇÕES DE INICIALIZAÇÃO ---
 function sortearPosicoes() {
     canvas.width = window.innerWidth * 0.94;
     canvas.height = canvas.width * 0.80;
-
-    const m = 0; 
+    const m = 20; 
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const sorteio = cantos[Math.floor(Math.random() * 4)];
-    hole.x = sorteio.x;
-    hole.y = sorteio.y;
+    hole.x = sorteio.x; hole.y = sorteio.y;
 
     const cX = canvas.width / 2;
     const cY = canvas.height / 2;
@@ -115,41 +95,56 @@ function sortearPosicoes() {
     branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
 }
 
+// --- LÓGICA DE APOSTA E SALDO ---
+async function confirmBet() {
+    try {
+        const res = await fetch('/fazer-aposta', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user: usuarioLogado, valor: valorAposta })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            apostaConfirmada = true;
+            dificuldadeRTP = data.rtp || 0.95;
+            document.getElementById("saldo").innerText = `R$ ${data.novoSaldo.toFixed(2)}`;
+            alert("Aposta Confirmada! Pode jogar.");
+        } else {
+            alert(data.message || "Saldo Insuficiente!");
+        }
+    } catch(e) { 
+        alert("Erro ao conectar no servidor. Verifique o Render.");
+    }
+}
+
+// --- RENDERIZAÇÃO ---
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // CAÇAPA
-    ctx.save();
     ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2);
     ctx.fillStyle = "#000"; ctx.fill();
     ctx.strokeStyle = "gold"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.restore();
 
-    // Substitua o bloco da MIRA (ESTILINGUE) por este:
-if(mouse.down) {
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]); // Isso faz a linha ficar pontilhada!
-    ctx.moveTo(branca.x, branca.y);
-    
-    // Projeção oposta ao puxão (estilo estilingue)
-    let dx = branca.x - mouse.x;
-    let dy = branca.y - mouse.y;
-    ctx.lineTo(branca.x + dx, branca.y + dy); 
-    
-    ctx.strokeStyle = "gold";
-    ctx.stroke();
-    ctx.setLineDash([]); // Reseta para não afetar o resto
-}
+    // MIRA PONTILHADA (CORREÇÃO BUG 2)
+    if(mouse.down && apostaConfirmada) {
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]); // Deixa pontilhado
+        ctx.moveTo(branca.x, branca.y);
+        // Trajetória inversa (estilingue)
+        let dx = branca.x - mouse.x;
+        let dy = branca.y - mouse.y;
+        ctx.lineTo(branca.x + dx, branca.y + dy);
+        ctx.strokeStyle = "rgba(255,215,0,0.8)"; ctx.stroke();
+        ctx.setLineDash([]); // Reseta o estilo
+    }
 
-    // BOLA BRANCA
+    // BOLAS
     ctx.fillStyle = "#fff";
     ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
-
-    // BOLA DOURADA
-    ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = "gold";
     ctx.fillStyle = "gold";
     ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
 
     moverBolas();
     requestAnimationFrame(desenhar);
@@ -163,101 +158,55 @@ function moverBolas() {
         if(b.y < b.r || b.y > canvas.height - b.r) b.vy *= -1;
     });
 
-    // COLISÃO BRANCA -> DOURADA (APLICA RTP)
+    // COLISÃO COM RTP (CORREÇÃO BUG 2)
     let dx = dourada.x - branca.x;
     let dy = dourada.y - branca.y;
     let dist = Math.sqrt(dx*dx + dy*dy);
     if(dist < branca.r + dourada.r) {
-    
-    // A força da bola dourada depende do RTP (ex: 0.5 faz ela andar metade da velocidade)
-    dourada.vx = branca.vx * dificuldadeRTP;
-    dourada.vy = branca.vy * dificuldadeRTP;
-    branca.vx *= -0.4;
-}
+        dourada.vx = (branca.vx * dificuldadeRTP);
+        dourada.vy = (branca.vy * dificuldadeRTP);
+        branca.vx *= -0.4;
+    }
 
     // VITÓRIA
     let distHole = Math.sqrt(Math.pow(dourada.x-hole.x, 2) + Math.pow(dourada.y-hole.y, 2));
     if(distHole < hole.r) {
-        alert("TACADA DE MESTRE! VOCÊ GANHOU!");
+        alert("GANHOU!");
+        apostaConfirmada = false; // Precisa apostar de novo
         sortearPosicoes();
     }
 }
 
-window.addEventListener("mouseup", () => {
+// --- INPUTS (MOUSE + TOUCH) ---
+function atualizarMouse(e) {
+    const r = canvas.getBoundingClientRect();
+    const ev = e.touches ? e.touches[0] : e;
+    mouse.x = ev.clientX - r.left;
+    mouse.y = ev.clientY - r.top;
+}
+
+canvas.addEventListener("mousedown", (e) => { mouse.down = true; atualizarMouse(e); });
+canvas.addEventListener("touchstart", (e) => { mouse.down = true; atualizarMouse(e); e.preventDefault(); });
+canvas.addEventListener("mousemove", (e) => { atualizarMouse(e); });
+canvas.addEventListener("touchmove", (e) => { atualizarMouse(e); e.preventDefault(); });
+
+window.addEventListener("mouseup", disparar);
+window.addEventListener("touchend", disparar);
+
+function disparar() {
     if(mouse.down && apostaConfirmada) {
         branca.vx = (branca.x - mouse.x) * 0.12;
         branca.vy = (branca.y - mouse.y) * 0.12;
-        apostaConfirmada = false; // Reseta para a próxima rodada
-    } else if (!apostaConfirmada) {
+         apostaConfirmada = false;  Descomente para exigir nova aposta após cada tacada
+    } else if (mouse.down && !apostaConfirmada) {
         alert("Confirme a aposta primeiro!");
     }
     mouse.down = false;
-});
-
-function atualizarMouse(e) {
-    const r = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - r.left;
-    mouse.y = e.clientY - r.top;
 }
 
-// 1. Variáveis de controle no topo do script
-let apostaConfirmada = false;
-let dificuldadeRTP = 1.0; // Padrão: 100% de força
-
-async function confirmBet() {
-    const usuarioLogado = localStorage.getItem("usuario");
-    
-    if (!usuarioLogado) {
-        alert("Faça login para jogar!");
-        return;
-    }
-
-    try {
-        // 2. Faz tudo em uma única chamada ao servidor por segurança
-        // O servidor desconta o saldo e já responde qual o RTP atual
-        const payRes = await fetch('/fazer-aposta', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: usuarioLogado, valor: valorAposta })
-        });
-
-        const data = await payRes.json();
-
-        if (data.success) {
-            apostaConfirmada = true;
-            dificuldadeRTP = data.rtp; // O servidor manda ex: 0.8 (80%)
-            
-            // Atualiza o saldo na tela com o que o servidor mandou
-            document.getElementById("saldo").innerText = `R$ ${data.novoSaldo.toFixed(2)}`;
-            
-            alert("Aposta Confirmada! Boa sorte.");
-        } else {
-            apostaConfirmada = false;
-            alert(data.message || "Erro ao processar aposta.");
-        }
-    } catch (err) {
-        console.error("Erro na conexão:", err);
-        alert("Erro técnico. Tente novamente.");
-    }
-}
-
-function selectBet(v, btn) {
-    valorAposta = v;
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    btn.classList.add('active-bet');
-    updateUI();
-}
-
-function updateCustom(v) { valorAposta = v; updateUI(); }
-function updateUI() { document.getElementById("lucro").innerText = "R$ " + (valorAposta * 3).toFixed(2); }
-
-function abrirModal(t) { 
-    document.getElementById("modalFinanceiro").style.display = "flex"; 
-    document.getElementById("conteudo-modal").innerHTML = `<h2>${t.toUpperCase()}</h2><input type='number' placeholder='Valor R$'><button style='background:gold; border:none; padding:10px; width:100%; font-weight:bold;'>PROSSEGUIR</button>`;
-}
-function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
-
-window.onload = () => { sortearPosicoes(); desenhar(); atualizarSaldoVisual(); };
+sortearPosicoes();
+desenhar();
+atualizarSaldoVisual();
 </script>
 </body>
 </html>
