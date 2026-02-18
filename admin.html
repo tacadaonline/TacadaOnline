@@ -2,33 +2,101 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>TACADA - PAINEL CONTROLE</title>
+    <title>TACADA ONLINE - DASHBOARD ADMIN</title>
     <style>
-        body { background: #000; color: gold; font-family: sans-serif; text-align: center; padding: 50px; }
-        .card { background: #111; padding: 30px; border: 2px solid gold; border-radius: 15px; display: inline-block; }
-        input { padding: 12px; margin: 10px; width: 80%; background: #222; border: 1px solid gold; color: #fff; border-radius: 5px; }
-        button { padding: 15px 30px; background: gold; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        body { background: #050505; color: gold; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #111; border: 2px solid gold; border-radius: 15px; padding: 25px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.2); }
+        h1 { border-bottom: 1px solid #333; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        .section { margin-bottom: 30px; padding: 15px; background: #1a1a1a; border-radius: 8px; border-left: 5px solid gold; }
+        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; margin: 5px; width: 200px; }
+        button { padding: 12px 25px; background: gold; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border-bottom: 1px solid #333; text-align: left; }
+        th { color: #888; font-size: 12px; }
+        .btn-pay { background: #00c853; color: white; padding: 5px 10px; font-size: 12px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>CONTROLE DE RTP</h2>
-        <p>0.9 = Ganha Fácil | 0.2 = Ganha Difícil</p>
-        <input type="number" id="v" step="0.1" placeholder="Valor RTP (Ex: 0.5)">
-        <input type="password" id="s" placeholder="Senha do Painel">
-        <br>
-        <button onclick="salvar()">ATUALIZAR DIFICULDADE</button>
+
+<div class="container">
+    <h1>Painel de Controle 🎱</h1>
+
+    <!-- SEÇÃO RTP -->
+    <div class="section">
+        <h3>Ajuste de Dificuldade (RTP)</h3>
+        <p style="font-size: 12px; color: #888;">0.95 = Justo | 0.20 = Casa Ganha Sempre</p>
+        <input type="number" id="vRtp" step="0.1" placeholder="RTP (Ex: 0.5)">
+        <input type="password" id="sAdmin" placeholder="Senha Mestra">
+        <button onclick="salvarRTP()">Aplicar</button>
     </div>
-    <script>
-        async function salvar() {
-            const res = await fetch("/admin/set-rtp", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ novoRTP: document.getElementById("v").value, senha: document.getElementById("s").value })
+
+    <!-- SEÇÃO GESTÃO DE CLIENTES -->
+    <div class="section">
+        <h3>Jogadores & Saques</h3>
+        <button onclick="listarUsuarios()">Atualizar Lista de Jogadores</button>
+        <table id="tabelaUsers">
+            <thead>
+                <tr>
+                    <th>USUÁRIO</th>
+                    <th>SALDO ATUAL</th>
+                    <th>AÇÃO</th>
+                </tr>
+            </thead>
+            <tbody id="listaCorpo">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const passInput = document.getElementById("sAdmin");
+
+    async function salvarRTP() {
+        const res = await fetch("/admin/set-rtp", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ novoRTP: document.getElementById("vRtp").value, senha: passInput.value })
+        });
+        const data = await res.json();
+        alert(data.success ? "Dificuldade atualizada!" : "Senha incorreta!");
+    }
+
+    async function listarUsuarios() {
+        const res = await fetch("/admin/usuarios", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ senha: passInput.value })
+        });
+        const data = await res.json();
+        if(data.success) {
+            const corpo = document.getElementById("listaCorpo");
+            corpo.innerHTML = "";
+            data.usuarios.forEach(u => {
+                corpo.innerHTML += `
+                    <tr>
+                        <td>${u.username}</td>
+                        <td style="color: #0f0;">R$ ${u.saldo.toFixed(2)}</td>
+                        <td>
+                            ${u.saldo > 0 ? `<button class="btn-pay" onclick="pagar('${u.username}')">Confirmar Saque</button>` : 'Sem Saldo'}
+                        </td>
+                    </tr>
+                `;
             });
-            const data = await res.json();
-            alert(data.success ? "DIFICULDADE ALTERADA!" : "ERRO!");
-        }
-    </script>
+        } else { alert("Erro ao carregar lista. Verifique a senha."); }
+    }
+
+    async function pagar(user) {
+        if(!confirm(`Confirmar que você já pagou o PIX para ${user} e zerar o saldo dele?`)) return;
+        const res = await fetch("/admin/pagar-saque", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username: user, senha: passInput.value })
+        });
+        const data = await res.json();
+        if(data.success) { alert(data.msg); listarUsuarios(); }
+    }
+</script>
+
 </body>
 </html>
