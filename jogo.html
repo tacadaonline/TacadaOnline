@@ -18,8 +18,8 @@
   .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
   
   #confirm { margin-bottom: 10px; padding: 12px 30px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; width: 90%; max-width: 320px; }
+  #confirm:disabled { background: #666; cursor: not-allowed; }
   
-  /* ÁREA FINANCEIRA LOGO ABAIXO DA MESA */
   .finance-area { display: flex; gap: 10px; width: 90%; max-width: 320px; margin-bottom: 15px; }
   .btn-finance { flex: 1; padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
   .btn-dep { background: #ffd700; color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
@@ -67,17 +67,28 @@
 let usuarioLogado = localStorage.getItem("usuario");
 let valorAposta = 10;
 let dificuldadeRTP = 0.95;
+let jogoAtivo = false;
+let velocidadeBranca = { x: 0, y: 0 };
+let atrito = 0.99;
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
 
-let branca = { x: 0, y: 0, r: 8 }, dourada = { x: 0, y: 0, r: 8 }, hole = { x: 0, y: 0, r: 14 };
+let branca = { x: 0, y: 0, r: 8 }, 
+    dourada = { x: 0, y: 0, r: 8 }, 
+    hole = { x: 0, y: 0, r: 14 };
 
-/* ===== 1. CAÇAPA NOS CANTOS & 3. PADRÃO DE BOLAS ===== */
+/* ===== INICIALIZAR POSIÇÕES =====*/
 function sortearPosicoes() {
     const m = 35; 
-    const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
+    const cantos = [
+        {x:m,y:m}, 
+        {x:canvas.width-m,y:m}, 
+        {x:m,y:canvas.height-m}, 
+        {x:canvas.width-m,y:canvas.height-m}
+    ];
     hole = cantos[Math.floor(Math.random() * 4)];
 
     const centroX = canvas.width / 2;
@@ -89,67 +100,203 @@ function sortearPosicoes() {
     branca.x = dourada.x + (hole.x < centroX ? 70 : -70);
     branca.y = dourada.y + (hole.y < centroY ? 70 : -70);
 
+    velocidadeBranca = { x: 0, y: 0 };
+    jogoAtivo = false;
+    
     desenhar();
 }
 
-/* ===== ATUALIZAR SALDO DO SERVIDOR ===== */
+/* ===== DESENHAR JOGO =====*/
+function desenhar() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Desenhar caçapa (VISÍVEL)
+    ctx.fillStyle = "#FF8C00";
+    ctx.beginPath(); 
+    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.strokeStyle = "#FFA500";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Desenhar bola branca
+    ctx.fillStyle = "#fff"; 
+    ctx.beginPath(); 
+    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.strokeStyle = "#ccc";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Desenhar bola dourada
+    ctx.fillStyle = "gold"; 
+    ctx.beginPath(); 
+    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.strokeStyle = "#FFD700";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+/* ===== PHYSICS DO JOGO =====*/
+function atualizarFisica() {
+    if (!jogoAtivo) return;
+
+    // Aplicar atrito
+    velocidadeBranca.x *= atrito;
+    velocidadeBranca.y *= atrito;
+
+    // Mover bola branca
+    branca.x += velocidadeBranca.x;
+    branca.y += velocidadeBranca.y;
+
+    // Colisão com paredes
+    if (branca.x - branca.r < 0) { branca.x = branca.r; velocidadeBranca.x *= -0.8; }
+    if (branca.x + branca.r > canvas.width) { branca.x = canvas.width - branca.r; velocidadeBranca.x *= -0.8; }
+    if (branca.y - branca.r < 0) { branca.y = branca.r; velocidadeBranca.y *= -0.8; }
+    if (branca.y + branca.r > canvas.height) { branca.y = canvas.height - branca.r; velocidadeBranca.y *= -0.8; }
+
+    // Colisão com a bola dourada
+    const dx = dourada.x - branca.x;
+    const dy = dourada.y - branca.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    
+    if (dist < branca.r + dourada.r) {
+        // Fórmula de colisão elástica simplificada
+        const vx = velocidadeBranca.x;
+        const vy = velocidadeBranca.y;
+        
+        const ux = dx / dist;
+        const uy = dy / dist;
+        
+        velocidadeBranca.x = ux * (vx * ux + vy * uy) * 0.9;
+        velocidadeBranca.y = uy * (vx * ux + vy * uy) * 0.9;
+        
+        dourada.x = branca.x + ux * (branca.r + dourada.r);
+        dourada.y = branca.y + uy * (branca.r + dourada.r);
+    }
+
+    // Verificar se bola dourada entrou na caçapa
+    const dxHole = hole.x - dourada.x;
+    const dyHole = hole.y - dourada.y;
+    const distHole = Math.sqrt(dxHole*dxHole + dyHole*dyHole);
+
+    if (distHole < hole.r + dourada.r) {
+        finalizarJogo(true); // GANHOU!
+    }
+
+    // Parar jogo se velocidade muito baixa
+    const velocidade = Math.sqrt(velocidadeBranca.x**2 + velocidadeBranca.y**2);
+    if (velocidade < 0.1) {
+        jogoAtivo = false;
+    }
+
+    desenhar();
+}
+
+/* ===== TOQUE NA TELA =====*/
+canvas.addEventListener("touchstart", (e) => {
+    if (!jogoAtivo) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    // Aplicar força na direção oposta ao clique
+    const forceX = x - branca.x;
+    const forceY = y - branca.y;
+    const dist = Math.sqrt(forceX*forceX + forceY*forceY);
+
+    if (dist < 100) {
+        velocidadeBranca.x = (forceX / dist) * 8;
+        velocidadeBranca.y = (forceY / dist) * 8;
+    }
+});
+
+/* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
         if(data.success) {
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-            console.log("Saldo atualizado:", data.saldo);
         }
     } catch (e) {
         console.log("Erro ao buscar saldo:", e);
     }
 }
 
-/* ===== LOGICA DE RTP (VEM DO SEU SERVER.JS) ===== */
+/* ===== CONFIRMAR APOSTA =====*/
 async function confirmBet() {
-    if (parseFloat(document.getElementById("saldo").innerText.replace("R$ ","")) < valorAposta) {
-        alert("Saldo Insuficiente!");
+    const saldoAtual = parseFloat(document.getElementById("saldo").innerText.replace("R$ ",""));
+    
+    if (saldoAtual < valorAposta) {
+        alert("❌ Saldo Insuficiente!");
         return;
     }
 
+    // Desabilitar botão durante requisição
+    const btnConfirm = document.getElementById("confirm");
+    btnConfirm.disabled = true;
+
     try {
-        // Busca o RTP atualizado do Painel Admin
+        // Buscar RTP
         const rtpRes = await fetch("/admin/get-rtp");
         const rtpData = await rtpRes.json();
         dificuldadeRTP = rtpData.rtp; 
         console.log("RTP Ativo:", dificuldadeRTP);
 
-        // NOVO: Atualizar saldo após confirmar aposta
-        await atualizarSaldoDoServidor();
+        // ✅ IMPORTANTE: Reiniciar jogo AQUI!
+        sortearPosicoes();
+        jogoAtivo = true;
+        
+        // Iniciar loop de física
+        if (!window.gameLoop) {
+            window.gameLoop = setInterval(atualizarFisica, 1000/60);
+        }
 
+        alert("✅ Aposta Confirmada! Clique na tela para chutar!");
+        
     } catch (e) {
-        console.log("Usando RTP padrão");
+        console.log("Erro ao confirmar aposta:", e);
+        alert("❌ Erro ao confirmar aposta");
+    } finally {
+        btnConfirm.disabled = false;
     }
-
-    alert("Aposta Confirmada! Boa sorte.");
 }
 
-function desenhar() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Desenhar caçapa com cor visível (dourada/laranja)
-    ctx.fillStyle = "#FF8C00";
-    ctx.beginPath(); 
-    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); 
-    ctx.fill();
-    
-    // Bola branca
-    ctx.fillStyle = "#fff"; 
-    ctx.beginPath(); 
-    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
-    ctx.fill();
-    
-    // Bola dourada
-    ctx.fillStyle = "gold"; 
-    ctx.beginPath(); 
-    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
-    ctx.fill();
+/* ===== FINALIZAR JOGO =====*/
+async function finalizarJogo(ganhou) {
+    jogoAtivo = false;
+
+    if (ganhou) {
+        alert("🎉 PARABÉNS! VOCÊ VENCEU!");
+        
+        try {
+            const res = await fetch("/api/aposta", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    username: usuarioLogado,
+                    valor: valorAposta,
+                    resultado: "ganhou"
+                })
+            });
+            
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+            }
+        } catch (e) {
+            console.log("Erro ao processar vitória:", e);
+        }
+    } else {
+        alert("❌ Você perdeu!");
+        await atualizarSaldoDoServidor();
+    }
+
+    sortearPosicoes();
 }
 
 function atualizarLucro() {
@@ -168,7 +315,6 @@ function updateCustom(val) {
     atualizarLucro();
 }
 
-/* ===== FINANCEIRO SUITPAY ===== */
 function abrirModal(tipo) {
     const modal = document.getElementById("modalFinanceiro");
     const cont = document.getElementById("conteudo-modal");
@@ -200,14 +346,17 @@ function fazerSaque() {
     atualizarSaldoDoServidor();
 }
 
-function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
+function fecharModal() { 
+    document.getElementById("modalFinanceiro").style.display = "none"; 
+}
 
-// Atualizar saldo e posições ao carregar
+// Inicializar ao carregar página
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
     atualizarSaldoDoServidor();
-    // Atualizar saldo a cada 5 segundos (opcional)
+    
+    // Atualizar saldo a cada 5 segundos
     setInterval(atualizarSaldoDoServidor, 5000);
 };
 </script>
