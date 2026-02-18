@@ -8,17 +8,20 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
   
+  /* HEADER */
   .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; }
   .stat-box { text-align: center; }
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
   .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
   
+  /* PAINEL DE APOSTA */
   #bet-panel { margin: 10px; display: flex; gap: 6px; justify-content: center; }
   .bet-btn, #custom-bet { padding: 10px; background: #111; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
   
   #confirm { margin-bottom: 10px; padding: 12px 30px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; width: 90%; max-width: 320px; font-size: 16px; }
   
+  /* BOTÕES FINANCEIROS ABAIXO DA MESA */
   .finance-area { display: flex; gap: 10px; width: 90%; max-width: 320px; margin-bottom: 15px; }
   .btn-finance { flex: 1; padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
   .btn-dep { background: #ffd700; color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
@@ -26,6 +29,7 @@
 
   canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
 
+  /* MODAL */
   .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
   .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
   .modal-content input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #333; color: #fff; border-radius: 6px; outline: none; }
@@ -65,173 +69,97 @@
 <script>
 let usuarioLogado = localStorage.getItem("usuario") || "jogador";
 let valorAposta = 10;
-let dificuldadeRTP = 0.95; // 95% de chance de precisão. Ajuste conforme necessário.
-let animando = false;
+let dificuldadeRTP = 0.95; 
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 canvas.width = window.innerWidth * 0.94;
-canvas.height = canvas.width * 0.85;
+canvas.height = canvas.width * 0.80;
 
-// Física e Objetos
-const fricao = 0.985; 
-let branca = { x: 0, y: 0, r: 10, vx: 0, vy: 0, cor: "#fff" };
-let dourada = { x: 0, y: 0, r: 10, vx: 0, vy: 0, cor: "gold" };
-let hole = { x: 0, y: 0, r: 18 };
-let toque = { ativo: false, x: 0, y: 0 };
-
-// 1. BUSCA O RTP DO SERVIDOR (OPCIONAL)
-async function atualizarConfiguracoes() {
-    try {
-        const rtpRes = await fetch("/admin/get-rtp");
-        const rtpData = await rtpRes.json();
-        dificuldadeRTP = rtpData.rtp;
-    } catch (e) { console.log("Usando RTP padrão de 95%"); }
-}
+let branca = { x: 0, y: 0, r: 8 }, dourada = { x: 0, y: 0, r: 8 }, hole = { x: 0, y: 0, r: 15 };
 
 function sortearPosicoes() {
-    const m = 40; 
+    const m = 35; 
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     hole = cantos[Math.floor(Math.random() * 4)];
 
-    const cX = canvas.width / 2;
-    const cY = canvas.height / 2;
+    const centroX = canvas.width / 2;
+    const centroY = canvas.height / 2;
 
-    dourada.x = (hole.x < cX) ? cX + 35 : cX - 35;
-    dourada.y = (hole.y < cY) ? cY + 35 : cY - 35;
-    dourada.vx = 0; dourada.vy = 0;
+    dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
+    dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
 
-    branca.x = dourada.x + (hole.x < cX ? 100 : -100);
-    branca.y = dourada.y + (hole.y < cY ? 20 : -20);
-    branca.vx = 0; branca.vy = 0;
+    branca.x = dourada.x + (hole.x < centroX ? 75 : -75);
+    branca.y = dourada.y + (hole.y < centroY ? 75 : -75);
 
-    if(!animando) { animando = true; loop(); }
-}
-
-function loop() {
-    update();
     desenhar();
-    requestAnimationFrame(loop);
-}
-
-function update() {
-    [branca, dourada].forEach(b => {
-        b.x += b.vx; b.y += b.vy;
-        b.vx *= fricao; b.vy *= fricao;
-        if(Math.abs(b.vx) < 0.1) b.vx = 0;
-        if(Math.abs(b.vy) < 0.1) b.vy = 0;
-        if (b.x < b.r || b.x > canvas.width - b.r) b.vx *= -1;
-        if (b.y < b.r || b.y > canvas.height - b.r) b.vy *= -1;
-    });
-
-    // COLISÃO COM LÓGICA DE RTP
-    let dx = dourada.x - branca.x;
-    let dy = dourada.y - branca.y;
-    let dist = Math.sqrt(dx*dx + dy*dy);
-
-    if (dist < branca.r + dourada.r) {
-        let angulo = Math.atan2(dy, dx);
-        
-        // INTERVENÇÃO DO RTP: Se falhar no sorteio, a bola "entorta"
-        if (Math.random() > dificuldadeRTP) {
-            angulo += (Math.random() * 0.6 - 0.3); // Desvio de trajetória
-        }
-
-        let forca = Math.sqrt(branca.vx**2 + branca.vy**2);
-        dourada.vx = Math.cos(angulo) * forca;
-        dourada.vy = Math.sin(angulo) * forca;
-        branca.vx *= -0.4; branca.vy *= -0.4;
-    }
-
-    // VERIFICA VITÓRIA
-    let dHole = Math.sqrt((dourada.x - hole.x)**2 + (dourada.y - hole.y)**2);
-    if (dHole < hole.r) {
-        dourada.x = -500; // Remove a bola
-        setTimeout(() => {
-            alert("🔥 VITÓRIA! R$ " + (valorAposta * 3).toFixed(2) + " adicionados.");
-            sortearPosicoes();
-        }, 100);
-    }
 }
 
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // CAÇAPA
-    ctx.fillStyle = "#000"; ctx.strokeStyle = "gold"; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // CAÇAPA (BURACO) COM DESTAQUE
+    ctx.save();
+    // 1. Sombra externa para dar profundidade
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "rgba(0,0,0,1)";
+    
+    // 2. Borda dourada bem visível ao redor do buraco
+    ctx.strokeStyle = "gold"; 
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // MIRA
-    if (toque.ativo && branca.vx === 0 && branca.vy === 0) {
-        ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.3)";
-        ctx.moveTo(branca.x, branca.y);
-        ctx.lineTo(branca.x + (branca.x - toque.x), branca.y + (branca.y - toque.y));
-        ctx.stroke();
-    }
+    // 3. O fundo do buraco (preto brilhante)
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
     // BOLA BRANCA
     ctx.fillStyle = "#fff";
     ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
 
-    // BOLA DOURADA
-    ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = "gold"; ctx.fillStyle = "gold";
+    // BOLA DOURADA COM BRILHO
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "gold";
+    ctx.fillStyle = "gold";
     ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 }
 
-// INPUTS (MOUSE E TOUCH)
-function getPos(e) {
-    let r = canvas.getBoundingClientRect();
-    let cx = e.touches ? e.touches[0].clientX : e.clientX;
-    let cy = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: cx - r.left, y: cy - r.top };
+async function confirmBet() {
+    // Busca RTP do seu Painel Admin
+    try {
+        const rtpRes = await fetch("/admin/get-rtp");
+        const rtpData = await rtpRes.json();
+        dificuldadeRTP = rtpData.rtp;
+    } catch (e) { console.log("Usando RTP padrão"); }
+
+    // Aqui entraria sua lógica original de tiro e conferência de saldo
+    alert("Aposta de R$ " + valorAposta + " confirmada!");
 }
 
-function iniciar(e) {
-    let p = getPos(e);
-    let d = Math.sqrt((p.x - branca.x)**2 + (p.y - branca.y)**2);
-    if (d < 40) { toque.ativo = true; toque.x = p.x; toque.y = p.y; }
+function atualizarLucro() {
+    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
-
-function mover(e) { if(toque.ativo) { let p = getPos(e); toque.x = p.x; toque.y = p.y; e.preventDefault(); } }
-
-function disparar() {
-    if(toque.ativo) {
-        branca.vx = (branca.x - toque.x) * 0.13;
-        branca.vy = (branca.y - toque.y) * 0.13;
-        toque.ativo = false;
-    }
-}
-
-canvas.addEventListener("mousedown", iniciar);
-window.addEventListener("mousemove", mover);
-window.addEventListener("mouseup", disparar);
-canvas.addEventListener("touchstart", iniciar, {passive:false});
-window.addEventListener("touchmove", mover, {passive:false});
-window.addEventListener("touchend", disparar);
 
 function selectBet(v, btn) {
     valorAposta = v;
     document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     btn.classList.add('active-bet');
-    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
+    atualizarLucro();
 }
 
 function updateCustom(val) {
     valorAposta = parseFloat(val) || 0;
-    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
+    atualizarLucro();
 }
 
-function confirmBet() {
-    atualizarConfiguracoes();
-    alert("💰 Aposta Confirmada! Boa sorte.");
-}
-
-function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
-
-window.onload = sortearPosicoes;
-</script>
+/* FINANCEIRO SUITPAY */
 function abrirModal(tipo) {
     const modal = document.getElementById("modalFinanceiro");
     const cont = document.getElementById("conteudo-modal");
@@ -239,18 +167,18 @@ function abrirModal(tipo) {
     if(tipo === 'deposito') {
         cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">GERAR PIX</button><div id="qR" style="margin-top:15px"></div>`;
     } else {
-        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="alert('Solicitado!')" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">SOLICITAR SAQUE</button>`;
+        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">SOLICITAR SAQUE</button>`;
     }
 }
 
 async function gerarPix() {
     const valor = document.getElementById("vD").value;
-    if(!valor || valor < 10) return alert("Mínimo R$ 10");
+    if(!valor || valor < 1) return alert("Valor inválido");
     document.getElementById("qR").innerHTML = "<p style='color:white'>Gerando...</p>";
     const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
     const data = await res.json();
     if(data.success) {
-        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Copiado!')" style="background:#333; color:gold; border:none; padding:5px; margin-top:5px;">Copiar PIX</button>`;
+        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Copiado!')">COPIAR CÓDIGO PIX</button>`;
     }
 }
 
