@@ -57,14 +57,15 @@
 
 <div id="canvas-container">
   <canvas id="game"></canvas>
-  <svg id="aim-line" width="100%" height="100%" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 50;">
-    <defs>
-      <linearGradient id="dotGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.9" />
-        <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.3" />
-      </linearGradient>
-    </defs>
-    <line id="aim-vector" x1="0" y1="0" x2="0" y2="0" stroke="url(#dotGrad)" stroke-width="3" stroke-dasharray="6,4" opacity="0.8"/>
+  <svg id="slingshot" width="100%" height="100%" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 50;">
+    <!-- Linha esquerda do estilingue -->
+    <line id="sling-left" x1="0" y1="0" x2="0" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.8" stroke-dasharray="4,2"/>
+    <!-- Linha direita do estilingue -->
+    <line id="sling-right" x1="0" y1="0" x2="0" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.8" stroke-dasharray="4,2"/>
+    <!-- Vetor de direção -->
+    <line id="force-vector" x1="0" y1="0" x2="0" y2="0" stroke="#FFA500" stroke-width="3" opacity="0.9"/>
+    <!-- Círculo na posição do dedo -->
+    <circle id="touch-indicator" cx="0" cy="0" r="8" fill="none" stroke="#FFD700" stroke-width="2" opacity="0.7"/>
   </svg>
 </div>
 
@@ -90,10 +91,18 @@ let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
 
+// Variáveis para o estilingue
+let touchStartX = 0;
+let touchStartY = 0;
+let isTouching = false;
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const aimLine = document.getElementById("aim-line");
-const aimVector = document.getElementById("aim-vector");
+const slingshot = document.getElementById("slingshot");
+const slingLeft = document.getElementById("sling-left");
+const slingRight = document.getElementById("sling-right");
+const forceVector = document.getElementById("force-vector");
+const touchIndicator = document.getElementById("touch-indicator");
 
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
@@ -129,6 +138,7 @@ function sortearPosicoes() {
     jogoAtivo = false;
     tempoJogo = 0;
     timerAtivo = false;
+    isTouching = false;
     
     desenhar();
 }
@@ -309,7 +319,6 @@ function atualizarFisica() {
         velocidadeDourada.y = 0;
         jogoAtivo = false;
         timerAtivo = false;
-        console.log("Jogo parou - velocidade baixa");
         
         setTimeout(() => {
             if (apostando && !jogoAtivo) {
@@ -322,105 +331,195 @@ function atualizarFisica() {
     desenhar();
 }
 
-/* ===== MOVER MIRA PONTILHADA =====*/
-canvas.addEventListener("mousemove", (e) => {
-    if (!jogoAtivo) {
-        aimLine.style.display = "none";
-        return;
-    }
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Calcular direção da mira
-    const dx = x - branca.x;
-    const dy = y - branca.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    // Estender a linha até o fim do canvas
-    const maxDist = Math.max(canvas.width, canvas.height) * 1.5;
-    const ux = (dx / dist) * maxDist;
-    const uy = (dy / dist) * maxDist;
-    
-    aimLine.style.display = "block";
-    aimVector.setAttribute("x1", branca.x);
-    aimVector.setAttribute("y1", branca.y);
-    aimVector.setAttribute("x2", branca.x + ux);
-    aimVector.setAttribute("y2", branca.y + uy);
-});
-
-canvas.addEventListener("touchmove", (e) => {
-    if (!jogoAtivo) return;
-    
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    
-    const dx = x - branca.x;
-    const dy = y - branca.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    const maxDist = Math.max(canvas.width, canvas.height) * 1.5;
-    const ux = (dx / dist) * maxDist;
-    const uy = (dy / dist) * maxDist;
-    
-    aimLine.style.display = "block";
-    aimVector.setAttribute("x1", branca.x);
-    aimVector.setAttribute("y1", branca.y);
-    aimVector.setAttribute("x2", branca.x + ux);
-    aimVector.setAttribute("y2", branca.y + uy);
-});
-
-canvas.addEventListener("mouseleave", () => {
-    aimLine.style.display = "none";
-});
-
-/* ===== TOQUE NA TELA =====*/
+/* ===== ESTILINGUE (SLINGSHOT) - TOUCH START =====*/
 canvas.addEventListener("touchstart", (e) => {
-    if (!jogoAtivo) {
-        console.log("Jogo não está ativo");
-        return;
-    }
+    if (!jogoAtivo || bolaMovida) return;
     
     e.preventDefault();
     
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-
-    aplicarForce(x, y);
+    
+    touchStartX = touch.clientX - rect.left;
+    touchStartY = touch.clientY - rect.top;
+    isTouching = true;
+    
+    slingshot.style.display = "block";
 });
 
-canvas.addEventListener("mousedown", (e) => {
-    if (!jogoAtivo) return;
+/* ===== ESTILINGUE (SLINGSHOT) - TOUCH MOVE =====*/
+canvas.addEventListener("touchmove", (e) => {
+    if (!jogoAtivo || !isTouching || bolaMovida) return;
     
+    e.preventDefault();
+    
+    const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    aplicarForce(x, y);
+    const currentX = touch.clientX - rect.left;
+    const currentY = touch.clientY - rect.top;
+    
+    // Calcular distância e ângulo entre toque inicial e atual
+    const dx = currentX - touchStartX;
+    const dy = currentY - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calcular vetor invertido (estilingue puxa para trás)
+    const invertedX = touchStartX - dx;
+    const invertedY = touchStartY - dy;
+    
+    // Linha esquerda do estilingue (da bola até invertido)
+    slingLeft.setAttribute("x1", branca.x);
+    slingLeft.setAttribute("y1", branca.y);
+    slingLeft.setAttribute("x2", invertedX - 5);
+    slingLeft.setAttribute("y2", invertedY - 5);
+    
+    // Linha direita do estilingue (da bola até invertido)
+    slingRight.setAttribute("x1", branca.x);
+    slingRight.setAttribute("y1", branca.y);
+    slingRight.setAttribute("x2", invertedX + 5);
+    slingRight.setAttribute("y2", invertedY + 5);
+    
+    // Vetor de força (direção oposta ao deslocamento do dedo)
+    if (dist > 10) {
+        const forceLength = Math.min(dist * 2, 300); // Limita o tamanho do vetor
+        const forceAngle = Math.atan2(-dy, -dx);
+        const forceEndX = branca.x + Math.cos(forceAngle) * forceLength;
+        const forceEndY = branca.y + Math.sin(forceAngle) * forceLength;
+        
+        forceVector.setAttribute("x1", branca.x);
+        forceVector.setAttribute("y1", branca.y);
+        forceVector.setAttribute("x2", forceEndX);
+        forceVector.setAttribute("y2", forceEndY);
+    }
+    
+    // Indicador na posição do toque
+    touchIndicator.setAttribute("cx", touchStartX);
+    touchIndicator.setAttribute("cy", touchStartY);
 });
 
-function aplicarForce(x, y) {
-    if (bolaMovida) return;
+/* ===== ESTILINGUE (SLINGSHOT) - TOUCH END =====*/
+canvas.addEventListener("touchend", (e) => {
+    if (!jogoAtivo || !isTouching || bolaMovida) {
+        slingshot.style.display = "none";
+        isTouching = false;
+        return;
+    }
     
-    const forceX = x - branca.x;
-    const forceY = y - branca.y;
-    const dist = Math.sqrt(forceX * forceX + forceY * forceY);
-
-    if (dist > 0 && dist < 250) {
-        const force = 20;
-        velocidadeBranca.x = (forceX / dist) * force;
-        velocidadeBranca.y = (forceY / dist) * force;
+    e.preventDefault();
+    
+    // Calcular força final
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const endX = touch.clientX - rect.left;
+    const endY = touch.clientY - rect.top;
+    
+    // Deslocamento do toque
+    const dx = endX - touchStartX;
+    const dy = endY - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Aplicar força na direção OPOSTA
+    if (dist > 5) { // Mínimo de movimento
+        const forceStrength = Math.min(dist / 10, 25);
+        const angle = Math.atan2(-dy, -dx);
+        
+        velocidadeBranca.x = Math.cos(angle) * forceStrength;
+        velocidadeBranca.y = Math.sin(angle) * forceStrength;
+        
         bolaMovida = true;
         timerAtivo = true;
-        aimLine.style.display = "none";
-        console.log("Força aplicada:", velocidadeBranca);
     }
-}
+    
+    slingshot.style.display = "none";
+    isTouching = false;
+});
+
+/* ===== MOUSE - PARA DESKTOP =====*/
+let mousePressed = false;
+
+canvas.addEventListener("mousedown", (e) => {
+    if (!jogoAtivo || bolaMovida) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    touchStartX = e.clientX - rect.left;
+    touchStartY = e.clientY - rect.top;
+    isTouching = true;
+    mousePressed = true;
+    
+    slingshot.style.display = "block";
+});
+
+document.addEventListener("mousemove", (e) => {
+    if (!jogoAtivo || !mousePressed || bolaMovida) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    const dx = currentX - touchStartX;
+    const dy = currentY - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    const invertedX = touchStartX - dx;
+    const invertedY = touchStartY - dy;
+    
+    slingLeft.setAttribute("x1", branca.x);
+    slingLeft.setAttribute("y1", branca.y);
+    slingLeft.setAttribute("x2", invertedX - 5);
+    slingLeft.setAttribute("y2", invertedY - 5);
+    
+    slingRight.setAttribute("x1", branca.x);
+    slingRight.setAttribute("y1", branca.y);
+    slingRight.setAttribute("x2", invertedX + 5);
+    slingRight.setAttribute("y2", invertedY + 5);
+    
+    if (dist > 10) {
+        const forceLength = Math.min(dist * 2, 300);
+        const forceAngle = Math.atan2(-dy, -dx);
+        const forceEndX = branca.x + Math.cos(forceAngle) * forceLength;
+        const forceEndY = branca.y + Math.sin(forceAngle) * forceLength;
+        
+        forceVector.setAttribute("x1", branca.x);
+        forceVector.setAttribute("y1", branca.y);
+        forceVector.setAttribute("x2", forceEndX);
+        forceVector.setAttribute("y2", forceEndY);
+    }
+    
+    touchIndicator.setAttribute("cx", touchStartX);
+    touchIndicator.setAttribute("cy", touchStartY);
+});
+
+document.addEventListener("mouseup", (e) => {
+    if (!jogoAtivo || !mousePressed || bolaMovida) {
+        slingshot.style.display = "none";
+        mousePressed = false;
+        isTouching = false;
+        return;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+    
+    const dx = endX - touchStartX;
+    const dy = endY - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 5) {
+        const forceStrength = Math.min(dist / 10, 25);
+        const angle = Math.atan2(-dy, -dx);
+        
+        velocidadeBranca.x = Math.cos(angle) * forceStrength;
+        velocidadeBranca.y = Math.sin(angle) * forceStrength;
+        
+        bolaMovida = true;
+        timerAtivo = true;
+    }
+    
+    slingshot.style.display = "none";
+    mousePressed = false;
+    isTouching = false;
+});
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
@@ -429,7 +528,6 @@ async function atualizarSaldoDoServidor() {
         const data = await res.json();
         if(data.success) {
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-            console.log("Saldo atualizado:", data.saldo);
         }
     } catch (e) {
         console.log("Erro ao buscar saldo:", e);
@@ -467,13 +565,11 @@ async function confirmBet() {
             return;
         }
 
-        console.log("Aposta confirmada! Novo saldo:", data.saldo);
         document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
 
         const rtpRes = await fetch("/admin/get-rtp");
         const rtpData = await rtpRes.json();
-        dificuldadeRTP = rtpData.rtp; 
-        console.log("RTP Ativo:", dificuldadeRTP);
+        dificuldadeRTP = rtpData.rtp;
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -490,10 +586,9 @@ async function confirmBet() {
             }, 1000/60);
         }
 
-        alert("✅ Aposta Confirmada! Clique na tela para chutar!");
+        alert("✅ Aposta Confirmada! Puxe para trás e solte!");
         
     } catch (e) {
-        console.log("Erro ao confirmar aposta:", e);
         alert("❌ Erro ao confirmar aposta: " + e.message);
     } finally {
         btnConfirm.disabled = false;
@@ -504,7 +599,7 @@ async function confirmBet() {
 async function finalizarJogo(ganhou) {
     jogoAtivo = false;
     timerAtivo = false;
-    aimLine.style.display = "none";
+    slingshot.style.display = "none";
 
     if (ganhou) {
         alert("🎉 PARABÉNS! VOCÊ VENCEU! Ganhou R$ " + (valorAposta * 3).toFixed(2));
@@ -523,7 +618,6 @@ async function finalizarJogo(ganhou) {
             const data = await res.json();
             if (data.success) {
                 document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-                console.log("Vitória registrada! Novo saldo:", data.saldo);
             }
         } catch (e) {
             console.log("Erro ao processar vitória:", e);
