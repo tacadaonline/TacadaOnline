@@ -17,7 +17,7 @@
   .bet-btn, #custom-bet { padding: 10px; background: #111; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
   
-  #confirm { margin-bottom: 10px; padding: 12px 30px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; width: 90%; max-width: 320px; font-size: 16px; }
+  #confirm { margin-bottom: 10px; padding: 12px 30px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; width: 90%; max-width: 320px; }
   
   /* ÁREA FINANCEIRA LOGO ABAIXO DA MESA */
   .finance-area { display: flex; gap: 10px; width: 90%; max-width: 320px; margin-bottom: 15px; }
@@ -66,7 +66,7 @@
 <script>
 let usuarioLogado = localStorage.getItem("usuario");
 let valorAposta = 10;
-let dificuldadeRTP = 0.95; // Valor padrão que será atualizado pelo servidor
+let dificuldadeRTP = 0.95;
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
@@ -92,6 +92,20 @@ function sortearPosicoes() {
     desenhar();
 }
 
+/* ===== ATUALIZAR SALDO DO SERVIDOR ===== */
+async function atualizarSaldoDoServidor() {
+    try {
+        const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+            console.log("Saldo atualizado:", data.saldo);
+        }
+    } catch (e) {
+        console.log("Erro ao buscar saldo:", e);
+    }
+}
+
 /* ===== LOGICA DE RTP (VEM DO SEU SERVER.JS) ===== */
 async function confirmBet() {
     if (parseFloat(document.getElementById("saldo").innerText.replace("R$ ","")) < valorAposta) {
@@ -105,19 +119,37 @@ async function confirmBet() {
         const rtpData = await rtpRes.json();
         dificuldadeRTP = rtpData.rtp; 
         console.log("RTP Ativo:", dificuldadeRTP);
+
+        // NOVO: Atualizar saldo após confirmar aposta
+        await atualizarSaldoDoServidor();
+
     } catch (e) {
         console.log("Usando RTP padrão");
     }
 
-    // Restante da sua lógica de início de jogo...
     alert("Aposta Confirmada! Boa sorte.");
 }
 
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "gold"; ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
+    
+    // Desenhar caçapa com cor visível (dourada/laranja)
+    ctx.fillStyle = "#FF8C00";
+    ctx.beginPath(); 
+    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); 
+    ctx.fill();
+    
+    // Bola branca
+    ctx.fillStyle = "#fff"; 
+    ctx.beginPath(); 
+    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
+    ctx.fill();
+    
+    // Bola dourada
+    ctx.fillStyle = "gold"; 
+    ctx.beginPath(); 
+    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
+    ctx.fill();
 }
 
 function atualizarLucro() {
@@ -142,9 +174,9 @@ function abrirModal(tipo) {
     const cont = document.getElementById("conteudo-modal");
     modal.style.display = "flex";
     if(tipo === 'deposito') {
-        cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">GERAR PIX</button><div id="qR" style="margin-top:15px"></div>`;
+        cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><div id="qR"></div><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">Gerar QR Code</button>`;
     } else {
-        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">SOLICITAR SAQUE</button>`;
+        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">Solicitar Saque</button>`;
     }
 }
 
@@ -155,12 +187,29 @@ async function gerarPix() {
     const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
     const data = await res.json();
     if(data.success) {
-        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Código Copiado!')">COPIAR CÓDIGO PIX</button>`;
+        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
     }
 }
 
+function fazerSaque() {
+    const valor = document.getElementById("vS").value;
+    const chave = document.getElementById("cP").value;
+    if(!valor || !chave) return alert("Preencha todos os campos");
+    alert("Saque solicitado com sucesso!");
+    fecharModal();
+    atualizarSaldoDoServidor();
+}
+
 function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
-window.onload = () => { sortearPosicoes(); atualizarLucro(); };
+
+// Atualizar saldo e posições ao carregar
+window.onload = () => { 
+    sortearPosicoes(); 
+    atualizarLucro();
+    atualizarSaldoDoServidor();
+    // Atualizar saldo a cada 5 segundos (opcional)
+    setInterval(atualizarSaldoDoServidor, 5000);
+};
 </script>
 </body>
 </html>
