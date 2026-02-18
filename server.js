@@ -12,58 +12,83 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
-// --- CREDENCIAIS ---
-const SUITPAY_ID = process.env.SUITPAY_ID || "SEU_CI_AQUI";
-const SUITPAY_SECRET = process.env.SUITPAY_SECRET || "SEU_CS_AQUI";
+// --- CREDENCIAIS (SUBSTITUA SE NECESSÁRIO) ---
+const SUITPAY_ID = process.env.SUITPAY_ID || "COLE_SEU_CI_AQUI";
+const SUITPAY_SECRET = process.env.SUITPAY_SECRET || "COLE_SEU_CS_AQUI";
 const SUITPAY_URL = "https://api.suitpay.app";
 
-// SENHA DO PAINEL ADMIN (MUDE AQUI SE QUISER)
+// CONFIGURAÇÃO DO ADMIN
 const ADMIN_PASSWORD_FIXA = "admin123"; 
-
-// VARIÁVEL GLOBAL DE RTP
 let globalRTP = 0.95; 
 
-// --- CONEXÃO MONGODB ---
+// --- CONEXÃO COM O MONGODB ---
 const MONGO_URI = "mongodb+srv://joaoprofvitor:qFmbWQW1ckquJ5Ql@cluster0.mavkxio.mongodb.net/tacada?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ MONGODB CONECTADO!"))
-    .catch(err => console.error("❌ ERRO MONGODB:", err));
+    .then(() => console.log("✅ MONGODB CONECTADO COM SUCESSO!"))
+    .catch(err => console.error("❌ ERRO AO CONECTAR MONGODB:", err));
 
 // --- MODELO DE USUÁRIO ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 },
-    dataCadastro: { type: Date, default: Date.now }
+    depositoInicial: { type: Number, default: 0 } 
 });
 const User = mongoose.model("User", UserSchema);
 
-// --- ROTAS ADMIN (PARA O SEU PAINEL FUNCIONAR) ---
+// --- ROTAS ADMIN (SINCRONIZADAS COM O ADMIN.HTML) ---
 
-// 1. Rota que retorna a lista de jogadores para a tabela
-app.get("/admin/usuarios", async (req, res) => {
+// 1. Listar todos os jogadores
+app.post("/admin/usuarios", async (req, res) => {
+    const { senha } = req.body;
+    if (senha !== ADMIN_PASSWORD_FIXA) {
+        return res.status(403).json({ success: false, msg: "Senha incorreta" });
+    }
     try {
-        const usuarios = await User.find({}, { password: 0 }).sort({ dataCadastro: -1 });
-        res.json(usuarios);
+        const usuarios = await User.find({}, { password: 0 }); // Esconde a senha por segurança
+        res.json({ success: true, usuarios: usuarios });
     } catch (err) {
-        res.status(500).json({ error: "Erro ao buscar lista" });
+        res.status(500).json({ success: false, msg: "Erro no banco de dados" });
     }
 });
 
-// 2. Rota para alterar o RTP via painel
+// 2. Alterar RTP (Dificuldade)
 app.post("/admin/set-rtp", (req, res) => {
     const { rtp, senha } = req.body;
-    if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ msg: "Senha Inválida" });
+    if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
     
     globalRTP = parseFloat(rtp);
-    res.json({ success: true, novoRTP: globalRTP });
+    console.log(`⚙️ Novo RTP: ${globalRTP}`);
+    res.json({ success: true });
 });
 
-// 3. Rota que o jogo consulta para saber a dificuldade
+// 3. Adicionar Saldo Manual
+app.post("/admin/add-saldo", async (req, res) => {
+    const { username, valor, senha } = req.body;
+    if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    
+    try {
+        await User.findOneAndUpdate({ username }, { $inc: { saldo: parseFloat(valor) } });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+// 4. Zerar Saldo (Pagar Saque)
+app.post("/admin/pagar-saque", async (req, res) => {
+    const { username, senha } = req.body;
+    if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    
+    try {
+        await User.findOneAndUpdate({ username }, { $set: { saldo: 0 } });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+// 5. Consulta de RTP para o Jogo
 app.get("/admin/get-rtp", (req, res) => res.json({ rtp: globalRTP }));
 
-// --- ROTAS DE JOGO E LOGIN ---
+// --- ROTAS DE LOGIN E CADASTRO ---
 
 app.post("/register", async (req, res) => {
     try {
@@ -72,7 +97,7 @@ app.post("/register", async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
         const novoUsuario = new User({ username: username.trim().toLowerCase(), password: hashedPassword });
         await novoUsuario.save();
-        res.json({ success: true, msg: "Cadastrado!" });
+        res.json({ success: true, msg: "Cadastro realizado!" });
     } catch (err) { res.status(500).json({ success: false, msg: "Usuário já existe" }); }
 });
 
@@ -81,13 +106,14 @@ app.post("/login", async (req, res) => {
         const { username, password } = req.body;
         const usuario = await User.findOne({ username: username.trim().toLowerCase() });
         if (!usuario) return res.status(401).json({ success: false });
+        
         const senhaValida = await bcrypt.compare(password, usuario.password);
         if (!senhaValida) return res.status(401).json({ success: false });
+        
         res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// Atualiza saldo após a partida (Win/Loss)
 app.post("/update-saldo", async (req, res) => {
     try {
         const { username, valor } = req.body;
@@ -96,7 +122,7 @@ app.post("/update-saldo", async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- FINANCEIRO SUITPAY ---
+// --- FINANCEIRO SUITPAY (DEPÓSITOS) ---
 
 app.post("/api/gerar-deposito", async (req, res) => {
     const { username, valor } = req.body;
@@ -116,7 +142,8 @@ app.post("/api/gerar-deposito", async (req, res) => {
 app.post("/api/webhook-suitpay", async (req, res) => {
     const { status, requestNumber, amount } = req.body;
     if (status === "PAID") {
-        const username = requestNumber.split('_')[2];
+        const parts = requestNumber.split('_');
+        const username = parts[2]; 
         await User.findOneAndUpdate({ username }, { $inc: { saldo: parseFloat(amount) } });
     }
     res.sendStatus(200);
@@ -126,4 +153,4 @@ app.post("/api/webhook-suitpay", async (req, res) => {
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 SERVIDOR ON NA PORTA ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 SERVIDOR RODANDO NA PORTA ${PORT}`));
