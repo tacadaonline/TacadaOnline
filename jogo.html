@@ -13,7 +13,7 @@
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
   .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
   
-  #bet-panel { margin: 10px; display: flex; gap: 6px; justify-content: center; }
+  #bet-panel { margin: 10px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
   .bet-btn, #custom-bet { padding: 10px; background: #111; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
   
@@ -25,7 +25,7 @@
   .btn-dep { background: #ffd700; color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
   .btn-saq { background: #2979ff; color: #fff; }
 
-  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); cursor: crosshair; }
 
   .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
   .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
@@ -68,8 +68,10 @@ let usuarioLogado = localStorage.getItem("usuario");
 let valorAposta = 10;
 let dificuldadeRTP = 0.95;
 let jogoAtivo = false;
+let apostando = false;
 let velocidadeBranca = { x: 0, y: 0 };
-let atrito = 0.99;
+let atrito = 0.98;
+let gameLoopRunning = false;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -82,12 +84,12 @@ let branca = { x: 0, y: 0, r: 8 },
 
 /* ===== INICIALIZAR POSIÇÕES =====*/
 function sortearPosicoes() {
-    const m = 35; 
+    const m = 50; 
     const cantos = [
-        {x:m,y:m}, 
-        {x:canvas.width-m,y:m}, 
-        {x:m,y:canvas.height-m}, 
-        {x:canvas.width-m,y:canvas.height-m}
+        {x: m, y: m}, 
+        {x: canvas.width - m, y: m}, 
+        {x: m, y: canvas.height - m}, 
+        {x: canvas.width - m, y: canvas.height - m}
     ];
     hole = cantos[Math.floor(Math.random() * 4)];
 
@@ -110,31 +112,41 @@ function sortearPosicoes() {
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Desenhar caçapa (VISÍVEL)
-    ctx.fillStyle = "#FF8C00";
+    // Desenhar CAÇAPA (bem visível!)
+    ctx.fillStyle = "#FF6B35";
     ctx.beginPath(); 
-    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); 
+    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); 
     ctx.fill();
-    ctx.strokeStyle = "#FFA500";
-    ctx.lineWidth = 2;
+    
+    // Borda da caçapa
+    ctx.strokeStyle = "#FFD700";
+    ctx.lineWidth = 3;
     ctx.stroke();
+    
+    // Sombra da caçapa
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.beginPath();
+    ctx.arc(hole.x, hole.y, hole.r - 2, 0, Math.PI * 2);
+    ctx.fill();
     
     // Desenhar bola branca
     ctx.fillStyle = "#fff"; 
     ctx.beginPath(); 
-    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
+    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI * 2); 
     ctx.fill();
+    
     ctx.strokeStyle = "#ccc";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     ctx.stroke();
     
     // Desenhar bola dourada
     ctx.fillStyle = "gold"; 
     ctx.beginPath(); 
-    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
+    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI * 2); 
     ctx.fill();
+    
     ctx.strokeStyle = "#FFD700";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     ctx.stroke();
 }
 
@@ -151,44 +163,65 @@ function atualizarFisica() {
     branca.y += velocidadeBranca.y;
 
     // Colisão com paredes
-    if (branca.x - branca.r < 0) { branca.x = branca.r; velocidadeBranca.x *= -0.8; }
-    if (branca.x + branca.r > canvas.width) { branca.x = canvas.width - branca.r; velocidadeBranca.x *= -0.8; }
-    if (branca.y - branca.r < 0) { branca.y = branca.r; velocidadeBranca.y *= -0.8; }
-    if (branca.y + branca.r > canvas.height) { branca.y = canvas.height - branca.r; velocidadeBranca.y *= -0.8; }
+    if (branca.x - branca.r < 0) { 
+        branca.x = branca.r; 
+        velocidadeBranca.x *= -0.7; 
+    }
+    if (branca.x + branca.r > canvas.width) { 
+        branca.x = canvas.width - branca.r; 
+        velocidadeBranca.x *= -0.7; 
+    }
+    if (branca.y - branca.r < 0) { 
+        branca.y = branca.r; 
+        velocidadeBranca.y *= -0.7; 
+    }
+    if (branca.y + branca.r > canvas.height) { 
+        branca.y = canvas.height - branca.r; 
+        velocidadeBranca.y *= -0.7; 
+    }
 
     // Colisão com a bola dourada
     const dx = dourada.x - branca.x;
     const dy = dourada.y - branca.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
+    const dist = Math.sqrt(dx * dx + dy * dy);
     
-    if (dist < branca.r + dourada.r) {
-        // Fórmula de colisão elástica simplificada
+    if (dist < branca.r + dourada.r && dist > 0) {
         const vx = velocidadeBranca.x;
         const vy = velocidadeBranca.y;
         
         const ux = dx / dist;
         const uy = dy / dist;
         
-        velocidadeBranca.x = ux * (vx * ux + vy * uy) * 0.9;
-        velocidadeBranca.y = uy * (vx * ux + vy * uy) * 0.9;
+        const v_dot = vx * ux + vy * uy;
         
-        dourada.x = branca.x + ux * (branca.r + dourada.r);
-        dourada.y = branca.y + uy * (branca.r + dourada.r);
+        velocidadeBranca.x = (ux * v_dot) * 0.85;
+        velocidadeBranca.y = (uy * v_dot) * 0.85;
+        
+        dourada.x = branca.x + ux * (branca.r + dourada.r + 1);
+        dourada.y = branca.y + uy * (branca.r + dourada.r + 1);
     }
 
     // Verificar se bola dourada entrou na caçapa
     const dxHole = hole.x - dourada.x;
     const dyHole = hole.y - dourada.y;
-    const distHole = Math.sqrt(dxHole*dxHole + dyHole*dyHole);
+    const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
     if (distHole < hole.r + dourada.r) {
         finalizarJogo(true); // GANHOU!
     }
 
     // Parar jogo se velocidade muito baixa
-    const velocidade = Math.sqrt(velocidadeBranca.x**2 + velocidadeBranca.y**2);
-    if (velocidade < 0.1) {
+    const velocidade = Math.sqrt(velocidadeBranca.x ** 2 + velocidadeBranca.y ** 2);
+    if (velocidade < 0.05 && velocidade > 0) {
+        velocidadeBranca.x = 0;
+        velocidadeBranca.y = 0;
         jogoAtivo = false;
+        console.log("Jogo parou - velocidade baixa");
+        setTimeout(() => {
+            if (apostando && !jogoAtivo) {
+                finalizarJogo(false); // PERDEU
+            }
+        }, 1000);
     }
 
     desenhar();
@@ -196,23 +229,43 @@ function atualizarFisica() {
 
 /* ===== TOQUE NA TELA =====*/
 canvas.addEventListener("touchstart", (e) => {
-    if (!jogoAtivo) return;
+    if (!jogoAtivo) {
+        console.log("Jogo não está ativo");
+        return;
+    }
+    
+    e.preventDefault();
     
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
 
-    // Aplicar força na direção oposta ao clique
+    aplicarForce(x, y);
+});
+
+canvas.addEventListener("mousedown", (e) => {
+    if (!jogoAtivo) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    aplicarForce(x, y);
+});
+
+function aplicarForce(x, y) {
     const forceX = x - branca.x;
     const forceY = y - branca.y;
-    const dist = Math.sqrt(forceX*forceX + forceY*forceY);
+    const dist = Math.sqrt(forceX * forceX + forceY * forceY);
 
-    if (dist < 100) {
-        velocidadeBranca.x = (forceX / dist) * 8;
-        velocidadeBranca.y = (forceY / dist) * 8;
+    if (dist > 0 && dist < 150) {
+        const force = 15;
+        velocidadeBranca.x = (forceX / dist) * force;
+        velocidadeBranca.y = (forceY / dist) * force;
+        console.log("Força aplicada:", velocidadeBranca);
     }
-});
+}
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
@@ -221,6 +274,7 @@ async function atualizarSaldoDoServidor() {
         const data = await res.json();
         if(data.success) {
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+            console.log("Saldo atualizado:", data.saldo);
         }
     } catch (e) {
         console.log("Erro ao buscar saldo:", e);
@@ -229,38 +283,66 @@ async function atualizarSaldoDoServidor() {
 
 /* ===== CONFIRMAR APOSTA =====*/
 async function confirmBet() {
-    const saldoAtual = parseFloat(document.getElementById("saldo").innerText.replace("R$ ",""));
+    const saldoAtual = parseFloat(document.getElementById("saldo").innerText.replace("R$ ", ""));
     
     if (saldoAtual < valorAposta) {
         alert("❌ Saldo Insuficiente!");
         return;
     }
 
-    // Desabilitar botão durante requisição
     const btnConfirm = document.getElementById("confirm");
     btnConfirm.disabled = true;
 
     try {
-        // Buscar RTP
+        // ✅ PASSO 1: Descontar a aposta no servidor ANTES de começar o jogo
+        const res = await fetch("/api/aposta", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                username: usuarioLogado,
+                valor: valorAposta,
+                resultado: "pendente" // Aposta em andamento
+            })
+        });
+
+        const data = await res.json();
+        
+        if (!data.success) {
+            alert("❌ Erro ao confirmar aposta");
+            btnConfirm.disabled = false;
+            return;
+        }
+
+        console.log("Aposta confirmada! Novo saldo:", data.saldo);
+        document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+
+        // ✅ PASSO 2: Buscar RTP
         const rtpRes = await fetch("/admin/get-rtp");
         const rtpData = await rtpRes.json();
         dificuldadeRTP = rtpData.rtp; 
         console.log("RTP Ativo:", dificuldadeRTP);
 
-        // ✅ IMPORTANTE: Reiniciar jogo AQUI!
+        // ✅ PASSO 3: Reiniciar jogo
         sortearPosicoes();
         jogoAtivo = true;
+        apostando = true;
         
-        // Iniciar loop de física
-        if (!window.gameLoop) {
-            window.gameLoop = setInterval(atualizarFisica, 1000/60);
+        // ✅ PASSO 4: Iniciar loop de física se não estiver rodando
+        if (!gameLoopRunning) {
+            gameLoopRunning = true;
+            let gameInterval = setInterval(() => {
+                atualizarFisica();
+                if (!gameLoopRunning) {
+                    clearInterval(gameInterval);
+                }
+            }, 1000/60); // 60 FPS
         }
 
         alert("✅ Aposta Confirmada! Clique na tela para chutar!");
         
     } catch (e) {
         console.log("Erro ao confirmar aposta:", e);
-        alert("❌ Erro ao confirmar aposta");
+        alert("❌ Erro ao confirmar aposta: " + e.message);
     } finally {
         btnConfirm.disabled = false;
     }
@@ -271,7 +353,7 @@ async function finalizarJogo(ganhou) {
     jogoAtivo = false;
 
     if (ganhou) {
-        alert("🎉 PARABÉNS! VOCÊ VENCEU!");
+        alert("🎉 PARABÉNS! VOCÊ VENCEU! Ganhou R$ " + (valorAposta * 3).toFixed(2));
         
         try {
             const res = await fetch("/api/aposta", {
@@ -287,15 +369,18 @@ async function finalizarJogo(ganhou) {
             const data = await res.json();
             if (data.success) {
                 document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+                console.log("Vitória registrada! Novo saldo:", data.saldo);
             }
         } catch (e) {
             console.log("Erro ao processar vitória:", e);
         }
     } else {
-        alert("❌ Você perdeu!");
+        alert("❌ Você perdeu! Tente novamente");
         await atualizarSaldoDoServidor();
     }
 
+    apostando = false;
+    gameLoopRunning = false;
     sortearPosicoes();
 }
 
@@ -308,11 +393,15 @@ function selectBet(v, btn) {
     document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     btn.classList.add('active-bet');
     atualizarLucro();
+    document.getElementById('custom-bet').value = '';
 }
 
 function updateCustom(val) {
-    valorAposta = parseFloat(val) || 0;
-    atualizarLucro();
+    if (val) {
+        valorAposta = parseFloat(val) || 0;
+        document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+        atualizarLucro();
+    }
 }
 
 function abrirModal(tipo) {
