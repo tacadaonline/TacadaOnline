@@ -26,9 +26,10 @@
   .btn-saq { background: #2979ff; color: #fff; }
 
   #canvas-container { position: relative; display: inline-block; margin-top: 10px; }
-  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: block; cursor: crosshair; }
+  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: block; cursor: none; }
   
-  #crosshair { position: fixed; width: 40px; height: 40px; pointer-events: none; display: none; z-index: 100; top: 0; left: 0; }
+  #aim-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; display: none; z-index: 50; }
+  #aim-guide svg { width: 100%; height: 100%; }
 
   .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
   .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
@@ -59,21 +60,37 @@
 
 <div id="canvas-container">
   <canvas id="game"></canvas>
+  <div id="aim-guide">
+    <svg viewBox="0 0 300 300">
+      <!-- Linha de mira (cônica) -->
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.8" />
+          <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0" />
+        </linearGradient>
+      </defs>
+      
+      <!-- Linha central -->
+      <line x1="150" y1="0" x2="150" y2="150" stroke="url(#lineGrad)" stroke-width="8" opacity="0.9"/>
+      
+      <!-- Círculos concêntricos -->
+      <circle cx="150" cy="150" r="50" fill="none" stroke="#FFD700" stroke-width="2" opacity="0.7"/>
+      <circle cx="150" cy="150" r="35" fill="none" stroke="#FFA500" stroke-width="1.5" opacity="0.6"/>
+      <circle cx="150" cy="150" r="20" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.8"/>
+      
+      <!-- Ponto central -->
+      <circle cx="150" cy="150" r="6" fill="#FFD700" opacity="1"/>
+      <circle cx="150" cy="150" r="3" fill="#FFF" opacity="0.9"/>
+      
+      <!-- Marcadores de ângulo -->
+      <g opacity="0.6">
+        <line x1="145" y1="80" x2="155" y2="80" stroke="#FFD700" stroke-width="2"/>
+        <line x1="145" y1="100" x2="155" y2="100" stroke="#FFD700" stroke-width="1.5"/>
+        <line x1="145" y1="120" x2="155" y2="120" stroke="#FFD700" stroke-width="1"/>
+      </g>
+    </svg>
+  </div>
 </div>
-
-<svg id="crosshair" viewBox="0 0 40 40">
-  <!-- Círculo externo -->
-  <circle cx="20" cy="20" r="15" fill="none" stroke="#FFD700" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.9"/>
-  <!-- Círculo interno -->
-  <circle cx="20" cy="20" r="8" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>
-  <!-- Ponto central grande -->
-  <circle cx="20" cy="20" r="3" fill="#FFD700" opacity="1"/>
-  <!-- Linhas de mira -->
-  <line x1="20" y1="2" x2="20" y2="9" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
-  <line x1="20" y1="31" x2="20" y2="38" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
-  <line x1="2" y1="20" x2="9" y2="20" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
-  <line x1="31" y1="20" x2="38" y2="20" stroke="#FFD700" stroke-width="1.5" opacity="0.9"/>
-</svg>
 
 <div id="modalFinanceiro" class="modal">
   <div class="modal-content">
@@ -91,14 +108,15 @@ let apostando = false;
 let bolaMovida = false;
 let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
-let atrito = 0.995; // ✅ Atrito reduzido para bolas não pararem rápido
+let atrito = 0.995;
 let gameLoopRunning = false;
 let tempoJogo = 0;
-let maxTempoJogo = 30; // 30 segundos máximo
+let tempoMaximo = 2.5; // ✅ 2.5 segundos
+let timerAtivo = false;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const crosshair = document.getElementById("crosshair");
+const aimGuide = document.getElementById("aim-guide");
 
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
@@ -133,6 +151,7 @@ function sortearPosicoes() {
     bolaMovida = false;
     jogoAtivo = false;
     tempoJogo = 0;
+    timerAtivo = false;
     
     desenhar();
 }
@@ -196,7 +215,18 @@ function desenhar() {
 function atualizarFisica() {
     if (!jogoAtivo) return;
 
-    tempoJogo += 1/60; // Incrementa tempo
+    if (timerAtivo) {
+        tempoJogo += 1/60;
+        const tempoRestante = Math.max(0, tempoMaximo - tempoJogo);
+        document.getElementById("tempo").innerText = tempoRestante.toFixed(2);
+        
+        if (tempoJogo >= tempoMaximo) {
+            timerAtivo = false;
+            jogoAtivo = false;
+            finalizarJogo(false);
+            return;
+        }
+    }
 
     // Aplicar atrito
     velocidadeBranca.x *= atrito;
@@ -282,17 +312,17 @@ function atualizarFisica() {
         }
     }
 
-    // ✅ Verificar se bola dourada entrou na caçapa
+    // Verificar se bola dourada entrou na caçapa
     const dxHole = hole.x - dourada.x;
     const dyHole = hole.y - dourada.y;
     const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
     if (distHole < hole.r) {
-        finalizarJogo(true); // GANHOU!
+        finalizarJogo(true);
         return;
     }
 
-    // ✅ Parar jogo apenas se bola foi movida E velocidade muito baixa
+    // Parar jogo apenas se bola foi movida E velocidade muito baixa
     const velocidade = Math.sqrt(velocidadeBranca.x ** 2 + velocidadeBranca.y ** 2);
     
     if (bolaMovida && velocidade < 0.2) {
@@ -301,20 +331,14 @@ function atualizarFisica() {
         velocidadeDourada.x = 0;
         velocidadeDourada.y = 0;
         jogoAtivo = false;
+        timerAtivo = false;
         console.log("Jogo parou - velocidade baixa");
         
         setTimeout(() => {
             if (apostando && !jogoAtivo) {
-                finalizarJogo(false); // PERDEU
+                finalizarJogo(false);
             }
         }, 1000);
-        return;
-    }
-
-    // ✅ Timeout se passar 30 segundos
-    if (tempoJogo > maxTempoJogo) {
-        jogoAtivo = false;
-        finalizarJogo(false);
         return;
     }
 
@@ -322,34 +346,47 @@ function atualizarFisica() {
 }
 
 /* ===== MOVER MIRA =====*/
-document.addEventListener("mousemove", (e) => {
+canvas.addEventListener("mousemove", (e) => {
     if (!jogoAtivo) {
-        crosshair.style.display = "none";
+        aimGuide.style.display = "none";
         return;
     }
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    // Verifica se mouse está sobre o canvas
-    if (e.clientX >= rect.left && e.clientX <= rect.right &&
-        e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        crosshair.style.display = "block";
-        crosshair.style.left = (x - 20) + "px";
-        crosshair.style.top = (y - 20) + "px";
-    } else {
-        crosshair.style.display = "none";
-    }
+    // Calcular ângulo da mira
+    const dx = x - branca.x;
+    const dy = y - branca.y;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+    aimGuide.style.display = "block";
+    aimGuide.style.left = branca.x + "px";
+    aimGuide.style.top = branca.y + "px";
+    aimGuide.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 });
 
-document.addEventListener("touchmove", (e) => {
+canvas.addEventListener("touchmove", (e) => {
     if (!jogoAtivo) return;
     
     const touch = e.touches[0];
-    crosshair.style.display = "block";
-    crosshair.style.left = (touch.clientX - 20) + "px";
-    crosshair.style.top = (touch.clientY - 20) + "px";
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    const dx = x - branca.x;
+    const dy = y - branca.y;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+    aimGuide.style.display = "block";
+    aimGuide.style.left = branca.x + "px";
+    aimGuide.style.top = branca.y + "px";
+    aimGuide.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+});
+
+canvas.addEventListener("mouseleave", () => {
+    aimGuide.style.display = "none";
 });
 
 /* ===== TOQUE NA TELA =====*/
@@ -380,15 +417,18 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 function aplicarForce(x, y) {
+    if (bolaMovida) return; // Só permite um clique
+    
     const forceX = x - branca.x;
     const forceY = y - branca.y;
     const dist = Math.sqrt(forceX * forceX + forceY * forceY);
 
     if (dist > 0 && dist < 250) {
-        const force = 20; // ✅ Força aumentada
+        const force = 20;
         velocidadeBranca.x = (forceX / dist) * force;
         velocidadeBranca.y = (forceY / dist) * force;
-        bolaMovida = true; // ✅ Marca que bola foi movida
+        bolaMovida = true;
+        timerAtivo = true; // ✅ Começa o timer aqui!
         console.log("Força aplicada:", velocidadeBranca);
     }
 }
@@ -449,6 +489,7 @@ async function confirmBet() {
         sortearPosicoes();
         jogoAtivo = true;
         apostando = true;
+        document.getElementById("tempo").innerText = tempoMaximo.toFixed(2);
         
         if (!gameLoopRunning) {
             gameLoopRunning = true;
@@ -473,7 +514,8 @@ async function confirmBet() {
 /* ===== FINALIZAR JOGO =====*/
 async function finalizarJogo(ganhou) {
     jogoAtivo = false;
-    crosshair.style.display = "none";
+    timerAtivo = false;
+    aimGuide.style.display = "none";
 
     if (ganhou) {
         alert("🎉 PARABÉNS! VOCÊ VENCEU! Ganhou R$ " + (valorAposta * 3).toFixed(2));
