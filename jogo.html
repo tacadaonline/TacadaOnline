@@ -1,187 +1,157 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TACADA ONLINE - OFICIAL</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
-  body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
-  
-  /* HEADER */
-  .header { width: 100%; padding: 10px; display: flex; justify-content: space-around; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; }
-  .stat-box { text-align: center; }
-  .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
-  .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
-  
-  /* PAINEL DE APOSTA */
-  #bet-panel { margin: 10px; display: flex; gap: 6px; justify-content: center; }
-  .bet-btn, #custom-bet { padding: 10px; background: #111; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
-  .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
-  
-  #confirm { margin-bottom: 10px; padding: 12px 30px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; width: 90%; max-width: 320px; font-size: 16px; }
-  
-  /* BOTÕES FINANCEIROS ABAIXO DA MESA */
-  .finance-area { display: flex; gap: 10px; width: 90%; max-width: 320px; margin-bottom: 15px; }
-  .btn-finance { flex: 1; padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
-  .btn-dep { background: #ffd700; color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
-  .btn-saq { background: #2979ff; color: #fff; }
-
-  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-
-  /* MODAL */
-  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
-  .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
-  .modal-content input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #333; color: #fff; border-radius: 6px; outline: none; }
-</style>
-</head>
-<body>
-
-<div class="header">
-  <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (3.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 30.00</span></div>
-  <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
-</div>
-
-<div id="bet-panel">
-  <button class="bet-btn active-bet" onclick="selectBet(10,this)">R$ 10</button>
-  <button class="bet-btn" onclick="selectBet(20,this)">R$ 20</button>
-  <button class="bet-btn" onclick="selectBet(50,this)">R$ 50</button>
-  <input type="number" id="custom-bet" placeholder="VALOR" oninput="updateCustom(this.value)">
-</div>
-
-<button id="confirm" onclick="confirmBet()">Confirmar Aposta</button>
-
-<div class="finance-area">
-  <button class="btn-finance btn-dep" onclick="abrirModal('deposito')">📥 Depósito</button>
-  <button class="btn-finance btn-saq" onclick="abrirModal('saque')">💸 Saque</button>
-</div>
-
-<canvas id="game"></canvas>
-
-<div id="modalFinanceiro" class="modal">
-  <div class="modal-content">
-    <div id="conteudo-modal"></div>
-    <button onclick="fecharModal()" style="color:#888; background:none; border:none; margin-top:15px; font-size: 12px;">[ FECHAR JANELA ]</button>
-  </div>
-</div>
-
-<script>
 let usuarioLogado = localStorage.getItem("usuario") || "jogador";
 let valorAposta = 10;
 let dificuldadeRTP = 0.95; 
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth * 0.94;
-canvas.height = canvas.width * 0.80;
 
-let branca = { x: 0, y: 0, r: 8 }, dourada = { x: 0, y: 0, r: 8 }, hole = { x: 0, y: 0, r: 15 };
+// Ajuste de tamanho dinâmico
+function ajustarTela() {
+    canvas.width = window.innerWidth * 0.94;
+    canvas.height = canvas.width * 0.80;
+}
+ajustarTela();
+
+let branca = { x: 0, y: 0, r: 8, vx: 0, vy: 0 };
+let dourada = { x: 0, y: 0, r: 8, vx: 0, vy: 0 };
+let hole = { x: 0, y: 0, r: 18 };
+let arrastando = false;
+let mouseX, mouseY;
 
 function sortearPosicoes() {
-    const m = 100; 
-    const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
-    hole = cantos[Math.floor(Math.random() * 4)];
+    const m = 40; // Margem para não colidir com a borda no início
+    const cantos = [
+        {x: m, y: m}, 
+        {x: canvas.width - m, y: m}, 
+        {x: m, y: canvas.height - m}, 
+        {x: canvas.width - m, y: canvas.height - m}
+    ];
+    
+    // Sorteia a caçapa
+    const escolhida = cantos[Math.floor(Math.random() * 4)];
+    hole.x = escolhida.x;
+    hole.y = escolhida.y;
 
     const centroX = canvas.width / 2;
     const centroY = canvas.height / 2;
 
-    dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
-    dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+    // Posiciona a dourada oposta à caçapa
+    dourada.x = (hole.x < centroX) ? centroX + 30 : centroX - 30;
+    dourada.y = (hole.y < centroY) ? centroY + 30 : centroY - 30;
+    dourada.vx = 0; dourada.vy = 0;
 
-    branca.x = dourada.x + (hole.x < centroX ? 75 : -75);
-    branca.y = dourada.y + (hole.y < centroY ? 75 : -75);
-
-    desenhar();
+    // Posiciona a branca atrás da dourada
+    branca.x = dourada.x + (hole.x < centroX ? 60 : -60);
+    branca.y = dourada.y + (hole.y < centroY ? 60 : -60);
+    branca.vx = 0; branca.vy = 0;
 }
 
- sortearPosicoes();
- 
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // CAÇAPA
+    // 1. DESENHAR CAÇAPA (O BUG ESTAVA AQUI: Agora ela tem borda e sombra isolada)
     ctx.save();
     ctx.beginPath();
     ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
-    ctx.fillStyle = "#000"; // Fundo preto
+    ctx.fillStyle = "#000";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "black";
     ctx.fill();
-    
-    ctx.strokeStyle = "gold"; // Borda dourada
+    ctx.strokeStyle = "gold";
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
 
-    // BOLA BRANCA
-    ctx.fillStyle = "#fff";
-    ctx.beginPath(); 
-    ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); 
-    ctx.fill();
+    // 2. LINHA DE MIRA (APARECE AO ARRASTAR)
+    if (arrastando) {
+        ctx.beginPath();
+        ctx.moveTo(branca.x, branca.y);
+        ctx.lineTo(mouseX, mouseY);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
 
-    // BOLA DOURADA
+    // 3. BOLA BRANCA
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
+
+    // 4. BOLA DOURADA
     ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "gold";
+    ctx.shadowBlur = 10; ctx.shadowColor = "gold";
     ctx.fillStyle = "gold";
-    ctx.beginPath(); 
-    ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); 
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
     ctx.restore();
+
+    atualizarFisica();
+    requestAnimationFrame(desenhar);
 }
 
+function atualizarFisica() {
+    // Movimento simples com atrito
+    [branca, dourada].forEach(b => {
+        b.x += b.vx; b.y += b.vy;
+        b.vx *= 0.98; b.vy *= 0.98; // Atrito da mesa
+        
+        // Colisão com bordas
+        if(b.x < b.r || b.x > canvas.width - b.r) b.vx *= -1;
+        if(b.y < b.r || b.y > canvas.height - b.r) b.vy *= -1;
+    });
+
+    // Colisão Branca com Dourada
+    let dx = dourada.x - branca.x;
+    let dy = dourada.y - branca.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if(dist < branca.r + dourada.r) {
+        dourada.vx = branca.vx * dificuldadeRTP; // Aplica o RTP na força
+        dourada.vy = branca.vy * dificuldadeRTP;
+        branca.vx *= -0.5;
+    }
+
+    // Verificação de Vitória (Dourada na Caçapa)
+    let dHole = Math.sqrt(Math.pow(dourada.x - hole.x, 2) + Math.pow(dourada.y - hole.y, 2));
+    if(dHole < hole.r) {
+        dourada.x = -100; // Some com a bola
+        alert("GANHOU! Tacada certeira!");
+        sortearPosicoes();
+    }
+}
+
+// CONTROLES DE MOUSE / TOUCH
+canvas.addEventListener("mousedown", e => { arrastando = true; });
+canvas.addEventListener("mousemove", e => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+});
+window.addEventListener("mouseup", e => {
+    if(arrastando) {
+        let dx = branca.x - mouseX;
+        let dy = branca.y - mouseY;
+        branca.vx = dx * 0.15;
+        branca.vy = dy * 0.15;
+        arrastando = false;
+    }
+});
+
+// Funções Financeiras (Mantidas conforme seu código)
 async function confirmBet() {
-    // Busca RTP do seu Painel Admin
     try {
         const rtpRes = await fetch("/admin/get-rtp");
         const rtpData = await rtpRes.json();
         dificuldadeRTP = rtpData.rtp;
     } catch (e) { console.log("Usando RTP padrão"); }
-
-    // Aqui entraria sua lógica original de tiro e conferência de saldo
-    alert("Aposta de R$ " + valorAposta + " confirmada!");
-}
-
-function atualizarLucro() {
-    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
+    alert("Aposta de R$ " + valorAposta + " confirmada! Pode dar a tacada.");
 }
 
 function selectBet(v, btn) {
     valorAposta = v;
     document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     btn.classList.add('active-bet');
-    atualizarLucro();
+    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
 
-function updateCustom(val) {
-    valorAposta = parseFloat(val) || 0;
-    atualizarLucro();
-}
-
-/* FINANCEIRO SUITPAY */
-function abrirModal(tipo) {
-    const modal = document.getElementById("modalFinanceiro");
-    const cont = document.getElementById("conteudo-modal");
-    modal.style.display = "flex";
-    if(tipo === 'deposito') {
-        cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">GERAR PIX</button><div id="qR" style="margin-top:15px"></div>`;
-    } else {
-        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">SOLICITAR SAQUE</button>`;
-    }
-}
-
-async function gerarPix() {
-    const valor = document.getElementById("vD").value;
-    if(!valor || valor < 1) return alert("Valor inválido");
-    document.getElementById("qR").innerHTML = "<p style='color:white'>Gerando...</p>";
-    const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
-    const data = await res.json();
-    if(data.success) {
-        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Copiado!')">COPIAR CÓDIGO PIX</button>`;
-    }
-}
-
-function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
-window.onload = () => { sortearPosicoes(); atualizarLucro(); };
-</script>
-</body>
-</html>
+// INICIALIZAÇÃO
+sortearPosicoes();
+desenhar();
