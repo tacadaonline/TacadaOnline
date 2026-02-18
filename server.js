@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 },
-    depositoInicial: { type: Number, default: 0 } // Para controlar o dobro do saque
+    depositoInicial: { type: Number, default: 0 } // Base para a regra do dobro
 });
 const User = mongoose.model("User", UserSchema);
 
@@ -46,6 +46,8 @@ app.get("/deposito.html", (req, res) => res.sendFile(path.join(__dirname, "depos
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "admin.html")));
 
 // --- ROTAS DO PAINEL ADMIN ---
+
+// 1. Alterar Dificuldade
 app.post("/admin/set-rtp", (req, res) => {
     const { novoRTP, senha } = req.body;
     if (senha === "12345") { 
@@ -55,11 +57,12 @@ app.post("/admin/set-rtp", (req, res) => {
     res.status(403).json({ success: false, msg: "Senha incorreta" });
 });
 
+// 2. Consultar Dificuldade (Usado pelo Jogo)
 app.get("/admin/get-rtp", (req, res) => {
     res.json({ rtp: globalRTP });
 });
 
-// LISTAR JOGADORES NO PAINEL
+// 3. Listar Jogadores
 app.post("/admin/usuarios", async (req, res) => {
     const { senha } = req.body;
     if (senha === "12345") {
@@ -69,29 +72,37 @@ app.post("/admin/usuarios", async (req, res) => {
     res.status(403).json({ success: false });
 });
 
-// ZERAR SALDO APÓS PAGAMENTO
-app.post("/admin/pagar-saque", async (req, res) => {
-    const { username, senha } = req.body;
+// 4. ADICIONAR SALDO (E definir meta de saque)
+app.post("/admin/add-saldo", async (req, res) => {
+    const { username, valor, senha } = req.body;
     if (senha === "12345") {
-        await User.findOneAndUpdate({ username }, { saldo: 0, depositoInicial: 0 });
-        return res.json({ success: true, msg: "Saldo zerado com sucesso!" });
+        const valorNum = parseFloat(valor);
+        const usuario = await User.findOneAndUpdate(
+            { username: username },
+            { 
+                $inc: { saldo: valorNum }, 
+                $set: { depositoInicial: valorNum } 
+            },
+            { new: true }
+        );
+        if (!usuario) return res.status(404).json({ success: false });
+        return res.json({ success: true, novoSaldo: usuario.saldo });
     }
     res.status(403).json({ success: false });
 });
 
-// --- ROTA DE LOGIN ---
-app.post("/login", async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const usuario = await User.findOne({ username: username.trim() });
-        if (!usuario) return res.status(401).json({ success: false, msg: "Usuário não encontrado" });
-        const senhaValida = await bcrypt.compare(password, usuario.password);
-        if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
-        return res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
-    } catch (err) { res.status(500).json({ success: false }); }
+// 5. Zerar Saldo (Saque Pago)
+app.post("/admin/pagar-saque", async (req, res) => {
+    const { username, senha } = req.body;
+    if (senha === "12345") {
+        await User.findOneAndUpdate({ username }, { saldo: 0, depositoInicial: 0 });
+        return res.json({ success: true, msg: "Saldo zerado!" });
+    }
+    res.status(403).json({ success: false });
 });
 
-// --- ROTA DE CADASTRO ---
+// --- ROTAS DO JOGADOR ---
+
 app.post("/register", async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -103,7 +114,17 @@ app.post("/register", async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- ATUALIZAR SALDO ---
+app.post("/login", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const usuario = await User.findOne({ username: username.trim() });
+        if (!usuario) return res.status(401).json({ success: false, msg: "Não encontrado" });
+        const senhaValida = await bcrypt.compare(password, usuario.password);
+        if (!senhaValida) return res.status(401).json({ success: false, msg: "Senha incorreta" });
+        return res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 app.post("/update-saldo", async (req, res) => {
     try {
         const { username, valor } = req.body;
@@ -116,24 +137,5 @@ app.post("/update-saldo", async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- ROTA DE SOLICITAR SAQUE (COM REGRA DO DOBRO) ---
-app.post("/solicitar-saque", async (req, res) => {
-    try {
-        const { username } = req.body;
-        const usuario = await User.findOne({ username });
-        
-        const meta = usuario.depositoInicial * 2;
-        
-        if (usuario.saldo < meta || usuario.saldo <= 0) {
-            return res.json({ 
-                success: false, 
-                msg: `Para sacar, seu saldo deve ser o dobro do depósito (Mínimo: R$ ${meta.toFixed(2)})` 
-            });
-        }
-
-        res.json({ success: true, msg: "Saque solicitado! Aguarde o pagamento do administrador." });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor na porta ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
