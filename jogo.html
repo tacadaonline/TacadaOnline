@@ -100,7 +100,7 @@ function sortearPosicoes() {
     canvas.width = window.innerWidth * 0.94;
     canvas.height = canvas.width * 0.80;
 
-    const m = 40; 
+    const m = 0; 
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     const sorteio = cantos[Math.floor(Math.random() * 4)];
     hole.x = sorteio.x;
