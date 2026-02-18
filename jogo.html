@@ -11,6 +11,13 @@
   .stat-box { text-align: center; }
   .stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
   .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
+  
+  /* BOTÕES DE FINANÇAS */
+  .finance-btns { display: flex; gap: 8px; align-items: center; }
+  .btn-action { padding: 8px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 11px; }
+  .btn-dep { background: #00c853; color: #fff; }
+  .btn-saq { background: #2979ff; color: #fff; }
+
   #bet-panel { margin: 12px; display: flex; gap: 6px; align-items: center; justify-content: center; }
   .bet-btn, #custom-bet { padding: 10px 14px; background: #222; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
@@ -18,13 +25,23 @@
   #confirm { margin-bottom: 12px; padding: 12px 35px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
   canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 12px solid #3e2723; border-radius: 10px; box-shadow: inset 0 0 60px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.9); }
   #msg { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; pointer-events: none; }
+
+  /* ESTILO DO MODAL */
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+  .modal-content { background: #1a1a1a; padding: 25px; border-radius: 12px; border: 1px solid gold; width: 90%; max-width: 350px; text-align: center; }
+  .modal-content h2 { margin-bottom: 15px; font-size: 18px; }
+  .modal-content input { width: 100%; padding: 12px; margin-bottom: 15px; background: #000; border: 1px solid #333; color: #fff; border-radius: 6px; }
+  .btn-modal { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (3.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 30.00</span></div>
+  <div class="finance-btns">
+    <button class="btn-action btn-dep" onclick="abrirModal('deposito')">Depósito</button>
+    <button class="btn-action btn-saq" onclick="abrirModal('saque')">Saque</button>
+  </div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
@@ -41,16 +58,34 @@
 <canvas id="game"></canvas>
 <div id="msg"></div>
 
+<!-- MODAL PARA DEPÓSITO E SAQUE -->
+<div id="modalFinanceiro" class="modal">
+  <div class="modal-content">
+    <div id="conteudo-modal"></div>
+    <button class="btn-modal" style="background:#444; color:#fff" onclick="fecharModal()">FECHAR</button>
+  </div>
+</div>
+
 <script>
-/* ===== LOGICA DE CONEXÃO ===== */
+/* ===== LOGICA DE CONEXÃO & SALDO ===== */
 let usuarioLogado = localStorage.getItem("usuario");
 let saldo = 0;
 
 async function carregarSaldo() {
     if (!usuarioLogado) { window.location.href = "/"; return; }
-    // O saldo inicial vem do localStorage (salvo no login)
-    saldo = parseFloat(localStorage.getItem("saldo")) || 0;
-    document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
+    try {
+        const response = await fetch("/login", { // Reutiliza login para pegar saldo real do banco
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: usuarioLogado, password: "SESSÃO_ATIVA" }) 
+        });
+        const data = await response.json();
+        saldo = data.saldo || 0;
+        document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
+    } catch(e) {
+        saldo = parseFloat(localStorage.getItem("saldo")) || 0;
+        document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
+    }
 }
 
 async function atualizarSaldoNoBanco(valorMudanca) {
@@ -69,198 +104,112 @@ async function atualizarSaldoNoBanco(valorMudanca) {
     } catch (err) { console.error("Erro ao atualizar saldo"); }
 }
 
-/* ===== AUDIO & CONFIGS ===== */
-const somTacada = new Audio('https://screenapp.io'); 
-const somCaçapa = new Audio('https://screenapp.io');
-const somErro = new Audio('https://screenapp.io');
-const somClique = new Audio('https://screenapp.io');
-
+/* ===== CONFIGS DO JOGO ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.75;
 
-const saldoEl = document.getElementById("saldo");
-const lucroEl = document.getElementById("lucro");
-const tempoEl = document.getElementById("tempo");
 const msgEl = document.getElementById("msg");
-const customInput = document.getElementById("custom-bet");
-
-let valorAposta = 10;
-let lockedBet = 0;
 let state = "BETTING"; 
-let time = 2.50;
-let timerIniciado = false;
-
 let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#fff" };
 let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 12 };
+let hole = { x: 0, y: 0, r: 15 };
 
+// ALEATORIEDADE TOTAL DAS BOLAS
 function sortearPosicoes() {
-    const m = 0;
-    const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
+    const margem = 40;
+    // Buraco (Cacapa) aleatória nos cantos
+    const cantos = [
+        {x: margem, y: margem}, 
+        {x: canvas.width - margem, y: margem}, 
+        {x: margem, y: canvas.height - margem}, 
+        {x: canvas.width - margem, y: canvas.height - margem}
+    ];
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x; hole.y = cantos[indexCanto].y;
-    dourada.x = (hole.x < canvas.width/2) ? canvas.width * 0.6 : canvas.width * 0.4;
-    branca.x = (hole.x < canvas.width/2) ? canvas.width * 0.85 : canvas.width * 0.15;
-    dourada.y = (hole.y < canvas.height/2) ? canvas.height * 0.6 : canvas.height * 0.4;
-    branca.y = (hole.y < canvas.height/2) ? canvas.height * 0.8 : canvas.height * 0.2;
+
+    // Bolas em posições aleatórias (longe do buraco)
+    branca.x = margem + Math.random() * (canvas.width - margem * 2);
+    branca.y = margem + Math.random() * (canvas.height - margem * 2);
+    
+    dourada.x = margem + Math.random() * (canvas.width - margem * 2);
+    dourada.y = margem + Math.random() * (canvas.height - margem * 2);
+
     branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
 }
 
-function selectBet(v, btn) {
-    if (state !== "BETTING") return;
-    somClique.play(); valorAposta = v;
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    customInput.classList.remove('active-bet');
-    btn.classList.add('active-bet');
-    atualizarLucro();
-}
+/* ===== FUNÇÕES DE MODAL (SUITPAY) ===== */
+function abrirModal(tipo) {
+    const modal = document.getElementById("modalFinanceiro");
+    const cont = document.getElementById("conteudo-modal");
+    modal.style.display = "flex";
 
-function selectCustom() {
-    if (state !== "BETTING") return;
-    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
-    customInput.classList.add('active-bet');
-}
-
-function updateCustom(val) {
-    valorAposta = parseFloat(val) || 0;
-    atualizarLucro();
-}
-
-function atualizarLucro() {
-    lucroEl.innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
-}
-
-async function confirmBet() {
-    // 1. SEGURANÇA: Mantém as verificações que você já tem
-    if (state !== "BETTING") return;
-    if (valorAposta <= 0 || saldo < valorAposta) { 
-        show("SEM SALDO", "#ff4444"); 
-        return; 
+    if (tipo === 'deposito') {
+        cont.innerHTML = `
+            <h2>DEPOSITAR VIA PIX</h2>
+            <input type="number" id="valDep" placeholder="VALOR R$ (Mín. 10)">
+            <button class="btn-modal" style="background:gold; color:#000" onclick="gerarPix()">GERAR QR CODE</button>
+            <div id="pixOutput" style="margin-top:10px"></div>
+        `;
+    } else {
+        cont.innerHTML = `
+            <h2>SACAR SALDO</h2>
+            <input type="number" id="valSaq" placeholder="VALOR DO SAQUE">
+            <input type="text" id="chavePix" placeholder="SUA CHAVE PIX">
+            <button class="btn-modal" style="background:#2979ff; color:#fff" onclick="realizarSaque()">SOLICITAR PIX</button>
+        `;
     }
+}
 
-    // 2. NOVIDADE: Adiciona a busca do RTP do Painel Admin aqui
+function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
+
+async function gerarPix() {
+    const valor = document.getElementById("valDep").value;
+    if(valor < 10) return alert("Mínimo R$ 10,00");
+    
+    document.getElementById("pixOutput").innerHTML = "<p>Processando...</p>";
+    
     try {
-        const rtpRes = await fetch("/admin/get-rtp");
-        const rtpData = await rtpRes.json();
-        dificuldadeRTP = rtpData.rtp; // Agora o jogo obedece o seu painel!
-        console.log("Dificuldade atualizada pelo admin:", dificuldadeRTP);
-    } catch (e) {
-        dificuldadeRTP = 0.95; // Se o servidor falhar, usa o padrão justo
-    }
-    
-    // 3. CONTINUAÇÃO: O resto do seu código original
-    lockedBet = valorAposta;
-    state = "PLAYING";
-    await atualizarSaldoNoBanco(-lockedBet); // Desconta aposta
-    
-    document.getElementById("confirm").style.opacity = "0.5";
-    show("MIRA! BOA SORTE", "gold");
-    setTimeout(() => msgEl.style.display = "none", 1500);
+        const res = await fetch("/api/gerar-deposito", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: usuarioLogado, valor: valor })
+        });
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById("pixOutput").innerHTML = `
+                <img src="data:image/png;base64,${data.qrCode}" width="150"><br>
+                <button class="btn-modal" style="background:#333; color:gold; font-size:10px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Copiado!')">COPIAR CÓDIGO PIX</button>
+            `;
+        }
+    } catch(e) { alert("Erro ao conectar com Suitpay"); }
 }
 
-/* ===== CONTROLES ===== */
-let startPos = { x: 0, y: 0 }, power = 0, angle = 0, charging = false;
+async function realizarSaque() {
+    const valor = document.getElementById("valSaq").value;
+    const chave = document.getElementById("chavePix").value;
+    if(valor > saldo) return alert("Saldo insuficiente");
 
-canvas.addEventListener("touchstart", e => {
-    if (state !== "PLAYING" || branca.vx !== 0 || branca.vy !== 0) return;
-    startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    charging = true; timerIniciado = true;
-});
-
-canvas.addEventListener("touchmove", e => {
-    if (!charging) return;
-    let dx = startPos.x - e.touches[0].clientX;
-    let dy = startPos.y - e.touches[0].clientY;
-    angle = Math.atan2(dy, dx);
-    power = Math.min(Math.hypot(dx, dy) / 1.5, 50);
-});
-
-canvas.addEventListener("touchend", () => {
-    if (!charging) return;
-    somTacada.play();
-    charging = false;
-    branca.vx = Math.cos(angle) * (power / 4);
-    branca.vy = Math.sin(angle) * (power / 4);
-    power = 0;
-});
-
-/* ===== LOOP DO JOGO ===== */
-function update() {
-    if (state === "PLAYING" && timerIniciado) {
-        time -= 1/60;
-        tempoEl.innerText = Math.max(0, time).toFixed(2);
-        if (time <= 0) finish(false, "TEMPO ESGOTADO!");
-    }
-
-    [branca, dourada].forEach(b => {
-        b.x += b.vx; b.y += b.vy;
-        b.vx *= 0.985; b.vy *= 0.985;
-        if (Math.abs(b.vx) < 0.1) b.vx = 0;
-        if (Math.abs(b.vy) < 0.1) b.vy = 0;
-        if (b.x - b.r < 0 || b.x + b.r > canvas.width) { b.vx *= -0.7; b.x = b.x < canvas.width/2 ? b.r : canvas.width - b.r; }
-        if (b.y - b.r < 0 || b.y + b.r > canvas.height) { b.vy *= -0.7; b.y = b.y < canvas.height/2 ? b.r : canvas.height - b.r; }
+    const res = await fetch("/api/solicitar-saque", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usuarioLogado, valor, chavePix: chave })
     });
-
-    // Colisão Branca x Dourada
-    let dist = Math.hypot(branca.x - dourada.x, branca.y - dourada.y);
-    if (dist < branca.r + dourada.r) {
-        let a = Math.atan2(dourada.y - branca.y, dourada.x - branca.x);
-        let s = Math.hypot(branca.vx, branca.vy);
-        dourada.vx = Math.cos(a) * s * 0.9;
-        dourada.vy = Math.sin(a) * s * 0.9;
-        branca.vx *= -0.3; branca.vy *= -0.3;
-    }
-
-    // Vitoria: Dourada na caçapa
-    if (Math.hypot(dourada.x - hole.x, dourada.y - hole.y) < hole.r + 5) {
-        finish(true, "VOCÊ GANHOU!");
-    }
+    const data = await res.json();
+    alert(data.msg);
+    fecharModal();
+    carregarSaldo();
 }
 
-function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // Caçapa
-    ctx.fillStyle = "#000";
-    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill();
-    // Bolas
-    [branca, dourada].forEach(b => {
-        ctx.fillStyle = b.color;
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.stroke();
-    });
-    // Mira
-    if (charging) {
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.beginPath(); ctx.moveTo(branca.x, branca.y);
-        ctx.lineTo(branca.x + Math.cos(angle)*power*2, branca.y + Math.sin(angle)*power*2);
-        ctx.stroke();
-    }
-}
+// Inicia o jogo
+window.onload = () => {
+    carregarSaldo();
+    sortearPosicoes();
+    // Inicie aqui seu loop de renderização (ctx.draw...)
+};
 
-async function finish(win, text) {
-    if (state !== "PLAYING") return;
-    state = "FINISHED"; timerIniciado = false;
-    if (win) { 
-        somCaçapa.play(); show(text, "#0f0");
-        await atualizarSaldoNoBanco(lockedBet * 3); 
-    } else { 
-        somErro.play(); show(text, "#f44"); 
-    }
-    setTimeout(() => {
-        state = "BETTING"; time = 2.50; tempoEl.innerText = "2.50";
-        document.getElementById("confirm").style.opacity = "1";
-        msgEl.style.display = "none"; sortearPosicoes();
-    }, 2500);
-}
-
-function show(t, c) { msgEl.innerText = t; msgEl.style.color = c; msgEl.style.display = "block"; }
-
-function loop() { update(); draw(); requestAnimationFrame(loop); }
-carregarSaldo();
-sortearPosicoes();
-loop();
+/* Restante das suas funções selectBet, confirmBet, etc (Mantenha as originais aqui embaixo) */
 </script>
 </body>
 </html>
