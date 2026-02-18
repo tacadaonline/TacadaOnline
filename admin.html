@@ -2,17 +2,23 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TACADA ONLINE - DASHBOARD SUPREMO</title>
     <style>
         body { background: #050505; color: gold; font-family: 'Segoe UI', sans-serif; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #111; border: 2px solid gold; border-radius: 15px; padding: 25px; }
+        .container { max-width: 900px; margin: 0 auto; background: #111; border: 2px solid gold; border-radius: 15px; padding: 25px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.2); }
         .section { margin-bottom: 20px; padding: 20px; background: #1a1a1a; border-radius: 10px; border-left: 5px solid gold; }
-        input { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; margin: 5px; }
-        button { padding: 10px 20px; background: gold; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; border-bottom: 1px solid #333; text-align: left; }
-        .btn-add { background: #2196F3; color: white; margin-left: 5px; }
+        h1 { text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+        h3 { margin-top: 0; color: #fff; }
+        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; margin: 5px 0; width: 100%; max-width: 250px; }
+        button { padding: 12px 20px; background: gold; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; transition: 0.3s; }
+        button:hover { background: #fff; transform: scale(1.05); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #000; }
+        th, td { padding: 15px; border-bottom: 1px solid #333; text-align: left; }
+        th { background: #222; color: gold; }
+        .btn-add { background: #2196F3; color: white; margin-right: 5px; }
         .btn-pay { background: #00c853; color: white; }
+        .status-msg { color: #888; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -21,89 +27,132 @@
     <h1>Controle Geral 🎱</h1>
 
     <div class="section">
-        <h3>Configurações Globais</h3>
-        <input type="password" id="sAdmin" placeholder="Senha Admin">
-        <input type="number" id="vRtp" step="0.1" placeholder="Novo RTP (Ex: 0.5)">
+        <h3>Configurações Globais (RTP)</h3>
+        <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">Defina a dificuldade: 0.1 (Difícil) até 1.0 (Fácil)</p>
+        <input type="password" id="sAdmin" placeholder="Senha Admin (Ex: admin123)">
+        <input type="number" id="vRtp" step="0.05" min="0" max="1" placeholder="Novo RTP (Ex: 0.95)">
         <button onclick="salvarRTP()">Mudar Dificuldade</button>
     </div>
 
     <div class="section">
         <h3>Gestão de Jogadores</h3>
-        <button onclick="listarUsuarios()">Listar Todos os Jogadores</button>
-        <table id="tabelaUsers">
+        <button onclick="listarUsuarios()">🔄 Atualizar Lista de Jogadores</button>
+        <p class="status-msg" id="statusMsg"></p>
+        <table>
             <thead>
                 <tr>
                     <th>USUÁRIO</th>
                     <th>SALDO</th>
-                    <th>DEPÓSITO BASE</th>
                     <th>AÇÕES</th>
                 </tr>
             </thead>
-            <tbody id="listaCorpo"></tbody>
+            <tbody id="listaCorpo">
+                <!-- Jogadores aparecem aqui -->
+            </tbody>
         </table>
     </div>
 </div>
 
 <script>
     const passInput = document.getElementById("sAdmin");
+    const statusMsg = document.getElementById("statusMsg");
 
+    // 1. SALVAR RTP (SINCRONIZADO COM SERVER.JS)
     async function salvarRTP() {
-        const res = await fetch("/admin/set-rtp", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ novoRTP: document.getElementById("vRtp").value, senha: passInput.value })
-        });
-        const data = await res.json();
-        alert(data.success ? "RTP Alterado!" : "Erro!");
-    }
+        const rtpValor = document.getElementById("vRtp").value;
+        if(!rtpValor || !passInput.value) return alert("Preencha a senha e o valor do RTP!");
 
-    async function listarUsuarios() {
-        const res = await fetch("/admin/usuarios", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ senha: passInput.value })
-        });
-        const data = await res.json();
-        if(data.success) {
-            const corpo = document.getElementById("listaCorpo");
-            corpo.innerHTML = "";
-            data.usuarios.forEach(u => {
-                corpo.innerHTML += `
-                    <tr>
-                        <td>${u.username}</td>
-                        <td style="color: #0f0;">R$ ${u.saldo.toFixed(2)}</td>
-                        <td>R$ ${u.depositoInicial.toFixed(2)}</td>
-                        <td>
-                            <button class="btn-add" onclick="addSaldo('${u.username}')">+ Add Saldo</button>
-                            <button class="btn-pay" onclick="pagar('${u.username}')">Zerar Saldo (Pago)</button>
-                        </td>
-                    </tr>
-                `;
+        try {
+            const res = await fetch("/admin/set-rtp", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ rtp: rtpValor, senha: passInput.value })
             });
+            const data = await res.json();
+            if(data.success) alert("✅ Dificuldade atualizada com sucesso!");
+            else alert("❌ Erro: Senha incorreta.");
+        } catch (err) {
+            alert("❌ Erro de conexão com o servidor.");
         }
     }
 
+    // 2. LISTAR USUÁRIOS (BUSCA NO MONGODB)
+    async function listarUsuarios() {
+        if(!passInput.value) return alert("Digite a senha do admin primeiro!");
+        
+        statusMsg.innerText = "Buscando jogadores no banco de dados...";
+        
+        try {
+            const res = await fetch("/admin/usuarios", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ senha: passInput.value })
+            });
+            
+            const data = await res.json();
+            
+            if(data.success) {
+                const corpo = document.getElementById("listaCorpo");
+                corpo.innerHTML = "";
+                
+                if(data.usuarios.length === 0) {
+                    corpo.innerHTML = "<tr><td colspan='3' style='text-align:center'>Nenhum jogador cadastrado ainda.</td></tr>";
+                }
+
+                data.usuarios.forEach(u => {
+                    corpo.innerHTML += `
+                        <tr>
+                            <td><strong>${u.username}</strong></td>
+                            <td style="color: #0f0; font-weight: bold;">R$ ${u.saldo.toFixed(2)}</td>
+                            <td>
+                                <button class="btn-add" onclick="addSaldo('${u.username}')">+ Saldo</button>
+                                <button class="btn-pay" onclick="pagar('${u.username}')">Zerar/Pagar</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                statusMsg.innerText = `Total: ${data.usuarios.length} jogadores encontrados.`;
+            } else {
+                alert("❌ Senha incorreta.");
+                statusMsg.innerText = "Erro na autenticação.";
+            }
+        } catch (err) {
+            console.error(err);
+            statusMsg.innerText = "Erro ao conectar com o servidor.";
+        }
+    }
+
+    // 3. ADICIONAR SALDO MANUALMENTE
     async function addSaldo(user) {
-        const valor = prompt(`Quanto de saldo deseja adicionar para ${user}?`);
-        if(!valor) return;
+        const valor = prompt(`Quanto de saldo deseja ADICIONAR para ${user}?`);
+        if(!valor || isNaN(valor)) return;
+
         const res = await fetch("/admin/add-saldo", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ username: user, valor: valor, senha: passInput.value })
         });
         const data = await res.json();
-        if(data.success) { alert("Saldo Adicionado!"); listarUsuarios(); }
+        if(data.success) {
+            alert("Saldo adicionado!");
+            listarUsuarios();
+        }
     }
 
+    // 4. ZERAR SALDO (ÚTIL APÓS PAGAR O SAQUE)
     async function pagar(user) {
-        if(!confirm(`Zerar o saldo de ${user}?`)) return;
+        if(!confirm(`Deseja zerar o saldo de ${user}? Use isso apenas após realizar o pagamento.`)) return;
+
         const res = await fetch("/admin/pagar-saque", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ username: user, senha: passInput.value })
         });
         const data = await res.json();
-        if(data.success) listarUsuarios();
+        if(data.success) {
+            alert("Saldo zerado!");
+            listarUsuarios();
+        }
     }
 </script>
 </body>
