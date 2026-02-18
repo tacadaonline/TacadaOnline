@@ -7,41 +7,46 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
-  .header { width: 100%; padding: 12px; display: flex; justify-content: space-around; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; }
-  .stat-box { text-align: center; }
-  .stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-  .stat-value { color: #fff; font-weight: bold; font-size: 18px; display: block; }
   
-  /* BOTÕES DE FINANÇAS */
-  .finance-btns { display: flex; gap: 8px; align-items: center; }
-  .btn-action { padding: 8px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 11px; }
-  .btn-dep { background: #00c853; color: #fff; }
-  .btn-saq { background: #2979ff; color: #fff; }
+  /* HEADER: FOCO TOTAL NO RETORNO E SALDO */
+  .header { width: 100%; padding: 15px; display: flex; justify-content: space-around; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); border-bottom: 2px solid #333; }
+  .stat-box { text-align: center; }
+  .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: block; }
+  .stat-value { color: #fff; font-weight: bold; font-size: 22px; display: block; }
+  
+  /* PAINEL DE APOSTA */
+  #bet-panel { margin: 15px; display: flex; gap: 8px; align-items: center; justify-content: center; }
+  .bet-btn, #custom-bet { padding: 12px 16px; background: #111; border: 1px solid #444; color: #aaa; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.3s; }
+  .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; box-shadow: 0 0 10px gold; }
+  #custom-bet { width: 85px; color: #fff; text-align: center; outline: none; }
+  
+  /* BOTÃO PRINCIPAL */
+  #confirm { margin-bottom: 15px; padding: 14px 45px; background: #00c853; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-size: 16px; }
+  
+  /* MESA DE JOGO */
+  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 12px solid #3e2723; border-radius: 12px; box-shadow: inset 0 0 60px rgba(0,0,0,0.8), 0 15px 40px rgba(0,0,0,0.9); }
+  
+  /* RODAPÉ: BOTÕES DE DEPÓSITO E SAQUE */
+  .footer-actions { width: 100%; padding: 15px; display: flex; justify-content: center; gap: 15px; margin-top: auto; background: #000; border-top: 1px solid #222; }
+  .btn-footer { flex: 1; max-width: 160px; padding: 12px; border: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; cursor: pointer; font-size: 13px; }
+  .btn-deposito { background: #28a745; color: white; }
+  .btn-saque { background: #2979ff; color: white; }
 
-  #bet-panel { margin: 12px; display: flex; gap: 6px; align-items: center; justify-content: center; }
-  .bet-btn, #custom-bet { padding: 10px 14px; background: #222; border: 1px solid #444; color: #aaa; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
-  .active-bet { color: #000 !important; border-color: gold !important; background: gold !important; }
-  #custom-bet { width: 75px; color: #fff; text-align: center; outline: none; }
-  #confirm { margin-bottom: 12px; padding: 12px 35px; background: #00c853; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-  canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 12px solid #3e2723; border-radius: 10px; box-shadow: inset 0 0 60px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.9); }
-  #msg { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 20px #000; pointer-events: none; }
+  /* MODAL */
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; justify-content: center; align-items: center; }
+  .modal-content { background: #151515; padding: 30px; border-radius: 15px; border: 1px solid gold; width: 85%; max-width: 360px; text-align: center; }
+  .modal-content h2 { color: gold; margin-bottom: 20px; font-size: 20px; }
+  .modal-content input { width: 100%; padding: 14px; margin-bottom: 15px; background: #000; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; }
+  .btn-modal-acao { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px; background: gold; color: #000; }
 
-  /* ESTILO DO MODAL */
-  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
-  .modal-content { background: #1a1a1a; padding: 25px; border-radius: 12px; border: 1px solid gold; width: 90%; max-width: 350px; text-align: center; }
-  .modal-content h2 { margin-bottom: 15px; font-size: 18px; }
-  .modal-content input { width: 100%; padding: 12px; margin-bottom: 15px; background: #000; border: 1px solid #333; color: #fff; border-radius: 6px; }
-  .btn-modal { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+  #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; display: none; font-weight: 900; z-index: 10; text-align: center; text-shadow: 0 0 25px #000; pointer-events: none; }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
-  <div class="finance-btns">
-    <button class="btn-action btn-dep" onclick="abrirModal('deposito')">Depósito</button>
-    <button class="btn-action btn-saq" onclick="abrirModal('saque')">Saque</button>
-  </div>
+  <div class="stat-box"><span class="stat-label">Retorno (3.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 30.00</span></div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">2.50</span></div>
 </div>
 
@@ -50,7 +55,7 @@
   <button class="bet-btn" onclick="selectBet(20,this)">R$ 20</button>
   <button class="bet-btn" onclick="selectBet(50,this)">R$ 50</button>
   <button class="bet-btn" onclick="selectBet(100,this)">R$ 100</button>
-  <input type="number" id="custom-bet" placeholder="VALOR" onfocus="selectCustom()" oninput="updateCustom(this.value)">
+  <input type="number" id="custom-bet" placeholder="OUTRO" onfocus="selectCustom()" oninput="updateCustom(this.value)">
 </div>
 
 <button id="confirm" onclick="confirmBet()">Confirmar Aposta</button>
@@ -58,68 +63,39 @@
 <canvas id="game"></canvas>
 <div id="msg"></div>
 
-<!-- MODAL PARA DEPÓSITO E SAQUE -->
+<div class="footer-actions">
+  <button class="btn-footer btn-deposito" onclick="abrirModal('deposito')">➕ DEPOSITAR</button>
+  <button class="btn-footer btn-saque" onclick="abrirModal('saque')">💸 SACAR PIX</button>
+</div>
+
+<!-- MODAL FINANCEIRO -->
 <div id="modalFinanceiro" class="modal">
   <div class="modal-content">
     <div id="conteudo-modal"></div>
-    <button class="btn-modal" style="background:#444; color:#fff" onclick="fecharModal()">FECHAR</button>
+    <button onclick="fecharModal()" style="background:transparent; color:#888; border:none; cursor:pointer; margin-top:10px;">FECHAR</button>
   </div>
 </div>
 
 <script>
 /* ===== LOGICA DE CONEXÃO & SALDO ===== */
-let usuarioLogado = localStorage.getItem("usuario");
+let usuarioLogado = localStorage.getItem("usuario") || "jogador_teste";
 let saldo = 0;
+let valorAposta = 10;
+let state = "BETTING";
 
-async function carregarSaldo() {
-    if (!usuarioLogado) { window.location.href = "/"; return; }
-    try {
-        const response = await fetch("/login", { // Reutiliza login para pegar saldo real do banco
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: usuarioLogado, password: "SESSÃO_ATIVA" }) 
-        });
-        const data = await response.json();
-        saldo = data.saldo || 0;
-        document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
-    } catch(e) {
-        saldo = parseFloat(localStorage.getItem("saldo")) || 0;
-        document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
-    }
-}
-
-async function atualizarSaldoNoBanco(valorMudanca) {
-    try {
-        const response = await fetch("/update-saldo", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: usuarioLogado, valor: valorMudanca })
-        });
-        const data = await response.json();
-        if (data.success) {
-            saldo = data.novoSaldo;
-            document.getElementById("saldo").innerText = `R$ ${saldo.toFixed(2)}`;
-            localStorage.setItem("saldo", saldo);
-        }
-    } catch (err) { console.error("Erro ao atualizar saldo"); }
-}
-
-/* ===== CONFIGS DO JOGO ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.75;
 
-const msgEl = document.getElementById("msg");
-let state = "BETTING"; 
-let branca = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#fff" };
-let dourada = { x: 0, y: 0, vx: 0, vy: 0, r: 8, color: "#ffd700" };
-let hole = { x: 0, y: 0, r: 15 };
+let branca = { x: 0, y: 0, r: 9, color: "#fff" };
+let dourada = { x: 0, y: 0, r: 9, color: "#ffd700" };
+let hole = { x: 0, y: 0, r: 16 };
 
-// ALEATORIEDADE TOTAL DAS BOLAS
+/* ===== 1. ALEATORIEDADE REFORÇADA ===== */
 function sortearPosicoes() {
-    const margem = 40;
-    // Buraco (Cacapa) aleatória nos cantos
+    const margem = 50;
+    // Cacapa em um dos 4 cantos aleatoriamente
     const cantos = [
         {x: margem, y: margem}, 
         {x: canvas.width - margem, y: margem}, 
@@ -129,17 +105,61 @@ function sortearPosicoes() {
     const indexCanto = Math.floor(Math.random() * 4);
     hole.x = cantos[indexCanto].x; hole.y = cantos[indexCanto].y;
 
-    // Bolas em posições aleatórias (longe do buraco)
+    // Bolas em posições 100% aleatórias na mesa
     branca.x = margem + Math.random() * (canvas.width - margem * 2);
     branca.y = margem + Math.random() * (canvas.height - margem * 2);
     
-    dourada.x = margem + Math.random() * (canvas.width - margem * 2);
-    dourada.y = margem + Math.random() * (canvas.height - margem * 2);
+    // Garante que a dourada não nasça em cima da branca
+    do {
+      dourada.x = margem + Math.random() * (canvas.width - margem * 2);
+      dourada.y = margem + Math.random() * (canvas.height - margem * 2);
+    } while (Math.hypot(branca.x - dourada.x, branca.y - dourada.y) < 60);
 
-    branca.vx = 0; branca.vy = 0; dourada.vx = 0; dourada.vy = 0;
+    desenharCena();
 }
 
-/* ===== FUNÇÕES DE MODAL (SUITPAY) ===== */
+function desenharCena() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Cacapa
+    ctx.fillStyle = "#000";
+    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill();
+    // Branca
+    ctx.fillStyle = branca.color;
+    ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
+    // Dourada
+    ctx.fillStyle = dourada.color;
+    ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
+}
+
+/* ===== 2. ATUALIZAÇÃO DO RETORNO (LUCRO) ===== */
+function atualizarLucro() {
+    const lucroEl = document.getElementById("lucro");
+    if (lucroEl) {
+        const total = (valorAposta * 3).toFixed(2);
+        lucroEl.innerText = `R$ ${total}`;
+    }
+}
+
+function selectBet(v, btn) {
+    if (state !== "BETTING") return;
+    valorAposta = v;
+    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+    document.getElementById("custom-bet").classList.remove('active-bet');
+    btn.classList.add('active-bet');
+    atualizarLucro();
+}
+
+function selectCustom() {
+    document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
+    document.getElementById("custom-bet").classList.add('active-bet');
+}
+
+function updateCustom(val) {
+    valorAposta = parseFloat(val) || 0;
+    atualizarLucro();
+}
+
+/* ===== 3. MODAIS SUITPAY NO RODAPÉ ===== */
 function abrirModal(tipo) {
     const modal = document.getElementById("modalFinanceiro");
     const cont = document.getElementById("conteudo-modal");
@@ -148,68 +168,49 @@ function abrirModal(tipo) {
     if (tipo === 'deposito') {
         cont.innerHTML = `
             <h2>DEPOSITAR VIA PIX</h2>
-            <input type="number" id="valDep" placeholder="VALOR R$ (Mín. 10)">
-            <button class="btn-modal" style="background:gold; color:#000" onclick="gerarPix()">GERAR QR CODE</button>
-            <div id="pixOutput" style="margin-top:10px"></div>
+            <input type="number" id="valDep" placeholder="VALOR R$ (EX: 20.00)">
+            <button class="btn-modal-acao" onclick="gerarPixSuitpay()">GERAR QR CODE</button>
+            <div id="areaPix" style="margin-top:15px"></div>
         `;
     } else {
         cont.innerHTML = `
-            <h2>SACAR SALDO</h2>
-            <input type="number" id="valSaq" placeholder="VALOR DO SAQUE">
-            <input type="text" id="chavePix" placeholder="SUA CHAVE PIX">
-            <button class="btn-modal" style="background:#2979ff; color:#fff" onclick="realizarSaque()">SOLICITAR PIX</button>
+            <h2>SACAR VIA PIX</h2>
+            <input type="number" id="valSaq" placeholder="VALOR R$">
+            <input type="text" id="chavePixSaq" placeholder="SUA CHAVE PIX">
+            <button class="btn-modal-acao" style="background:#2979ff; color:#fff" onclick="fazerSaque()">SOLICITAR SAQUE</button>
         `;
     }
 }
 
-function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
-
-async function gerarPix() {
+async function gerarPixSuitpay() {
     const valor = document.getElementById("valDep").value;
-    if(valor < 10) return alert("Mínimo R$ 10,00");
-    
-    document.getElementById("pixOutput").innerHTML = "<p>Processando...</p>";
+    if(valor < 5) return alert("Valor mínimo R$ 5,00");
+    document.getElementById("areaPix").innerHTML = "<p style='color:white'>Gerando Pix...</p>";
     
     try {
         const res = await fetch("/api/gerar-deposito", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: usuarioLogado, valor: valor })
+            body: JSON.stringify({ username: usuarioLogado, valor })
         });
         const data = await res.json();
         if(data.success) {
-            document.getElementById("pixOutput").innerHTML = `
-                <img src="data:image/png;base64,${data.qrCode}" width="150"><br>
-                <button class="btn-modal" style="background:#333; color:gold; font-size:10px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Copiado!')">COPIAR CÓDIGO PIX</button>
+            document.getElementById("areaPix").innerHTML = `
+                <img src="data:image/png;base64,${data.qrCode}" width="180" style="border:5px solid white; border-radius:10px;"><br>
+                <button class="btn-modal-acao" style="background:#333; color:gold; margin-top:10px; font-size:11px" onclick="navigator.clipboard.writeText('${data.copyPaste}'); alert('Código Copiado!')">COPIAR CÓDIGO PIX</button>
             `;
         }
-    } catch(e) { alert("Erro ao conectar com Suitpay"); }
+    } catch(e) { alert("Erro ao conectar com o servidor."); }
 }
 
-async function realizarSaque() {
-    const valor = document.getElementById("valSaq").value;
-    const chave = document.getElementById("chavePix").value;
-    if(valor > saldo) return alert("Saldo insuficiente");
+function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
 
-    const res = await fetch("/api/solicitar-saque", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usuarioLogado, valor, chavePix: chave })
-    });
-    const data = await res.json();
-    alert(data.msg);
-    fecharModal();
-    carregarSaldo();
-}
-
-// Inicia o jogo
+/* ===== INICIALIZAÇÃO ===== */
 window.onload = () => {
-    carregarSaldo();
-    sortearPosicoes();
-    // Inicie aqui seu loop de renderização (ctx.draw...)
+    atualizarLucro(); // Garante que o lucro apareça de cara
+    sortearPosicoes(); // Garante bolas aleatórias no início
+    // carregarSaldo(); <- Sua função original de saldo
 };
-
-/* Restante das suas funções selectBet, confirmBet, etc (Mantenha as originais aqui embaixo) */
 </script>
 </body>
 </html>
