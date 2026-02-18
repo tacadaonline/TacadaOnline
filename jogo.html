@@ -65,93 +65,173 @@
 <script>
 let usuarioLogado = localStorage.getItem("usuario") || "jogador";
 let valorAposta = 10;
-let dificuldadeRTP = 0.95; 
+let dificuldadeRTP = 0.95; // 95% de chance de precisão. Ajuste conforme necessário.
+let animando = false;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth * 0.94;
-canvas.height = canvas.width * 0.80;
 
-// hole.r aumentado para 18 para garantir visibilidade
-let branca = { x: 0, y: 0, r: 8 }, dourada = { x: 0, y: 0, r: 8 }, hole = { x: 0, y: 0, r: 18 };
+canvas.width = window.innerWidth * 0.94;
+canvas.height = canvas.width * 0.85;
+
+// Física e Objetos
+const fricao = 0.985; 
+let branca = { x: 0, y: 0, r: 10, vx: 0, vy: 0, cor: "#fff" };
+let dourada = { x: 0, y: 0, r: 10, vx: 0, vy: 0, cor: "gold" };
+let hole = { x: 0, y: 0, r: 18 };
+let toque = { ativo: false, x: 0, y: 0 };
+
+// 1. BUSCA O RTP DO SERVIDOR (OPCIONAL)
+async function atualizarConfiguracoes() {
+    try {
+        const rtpRes = await fetch("/admin/get-rtp");
+        const rtpData = await rtpRes.json();
+        dificuldadeRTP = rtpData.rtp;
+    } catch (e) { console.log("Usando RTP padrão de 95%"); }
+}
 
 function sortearPosicoes() {
-    const m = 5; 
+    const m = 40; 
     const cantos = [{x:m,y:m}, {x:canvas.width-m,y:m}, {x:m,y:canvas.height-m}, {x:canvas.width-m,y:canvas.height-m}];
     hole = cantos[Math.floor(Math.random() * 4)];
 
-    const centroX = canvas.width / 2;
-    const centroY = canvas.height / 2;
+    const cX = canvas.width / 2;
+    const cY = canvas.height / 2;
 
-    dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
-    dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+    dourada.x = (hole.x < cX) ? cX + 35 : cX - 35;
+    dourada.y = (hole.y < cY) ? cY + 35 : cY - 35;
+    dourada.vx = 0; dourada.vy = 0;
 
-    branca.x = dourada.x + (hole.x < centroX ? 75 : -75);
-    branca.y = dourada.y + (hole.y < centroY ? 75 : -75);
+    branca.x = dourada.x + (hole.x < cX ? 100 : -100);
+    branca.y = dourada.y + (hole.y < cY ? 20 : -20);
+    branca.vx = 0; branca.vy = 0;
 
+    if(!animando) { animando = true; loop(); }
+}
+
+function loop() {
+    update();
     desenhar();
+    requestAnimationFrame(loop);
+}
+
+function update() {
+    [branca, dourada].forEach(b => {
+        b.x += b.vx; b.y += b.vy;
+        b.vx *= fricao; b.vy *= fricao;
+        if(Math.abs(b.vx) < 0.1) b.vx = 0;
+        if(Math.abs(b.vy) < 0.1) b.vy = 0;
+        if (b.x < b.r || b.x > canvas.width - b.r) b.vx *= -1;
+        if (b.y < b.r || b.y > canvas.height - b.r) b.vy *= -1;
+    });
+
+    // COLISÃO COM LÓGICA DE RTP
+    let dx = dourada.x - branca.x;
+    let dy = dourada.y - branca.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < branca.r + dourada.r) {
+        let angulo = Math.atan2(dy, dx);
+        
+        // INTERVENÇÃO DO RTP: Se falhar no sorteio, a bola "entorta"
+        if (Math.random() > dificuldadeRTP) {
+            angulo += (Math.random() * 0.6 - 0.3); // Desvio de trajetória
+        }
+
+        let forca = Math.sqrt(branca.vx**2 + branca.vy**2);
+        dourada.vx = Math.cos(angulo) * forca;
+        dourada.vy = Math.sin(angulo) * forca;
+        branca.vx *= -0.4; branca.vy *= -0.4;
+    }
+
+    // VERIFICA VITÓRIA
+    let dHole = Math.sqrt((dourada.x - hole.x)**2 + (dourada.y - hole.y)**2);
+    if (dHole < hole.r) {
+        dourada.x = -500; // Remove a bola
+        setTimeout(() => {
+            alert("🔥 VITÓRIA! R$ " + (valorAposta * 3).toFixed(2) + " adicionados.");
+            sortearPosicoes();
+        }, 100);
+    }
 }
 
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // CAÇAPA (BURACO) - CORRIGIDO
-    ctx.save();
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "rgba(0,0,0,1)";
-    
-    // Borda da caçapa
-    ctx.strokeStyle = "gold"; 
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
-    ctx.stroke();
+    // CAÇAPA
+    ctx.fillStyle = "#000"; ctx.strokeStyle = "gold"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 
-    // Fundo da caçapa (Agora realmente PRETO)
-    ctx.fillStyle = "#000"; 
-    ctx.beginPath();
-    ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    // MIRA
+    if (toque.ativo && branca.vx === 0 && branca.vy === 0) {
+        ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.moveTo(branca.x, branca.y);
+        ctx.lineTo(branca.x + (branca.x - toque.x), branca.y + (branca.y - toque.y));
+        ctx.stroke();
+    }
 
     // BOLA BRANCA
     ctx.fillStyle = "#fff";
     ctx.beginPath(); ctx.arc(branca.x, branca.y, branca.r, 0, Math.PI*2); ctx.fill();
 
     // BOLA DOURADA
-    ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "gold";
-    ctx.fillStyle = "gold";
+    ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = "gold"; ctx.fillStyle = "gold";
     ctx.beginPath(); ctx.arc(dourada.x, dourada.y, dourada.r, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 }
 
-async function confirmBet() {
-    try {
-        const rtpRes = await fetch("/admin/get-rtp");
-        const rtpData = await rtpRes.json();
-        dificuldadeRTP = rtpData.rtp;
-    } catch (e) { console.log("Usando RTP padrão"); }
-    alert("Aposta de R$ " + valorAposta + " confirmada!");
+// INPUTS (MOUSE E TOUCH)
+function getPos(e) {
+    let r = canvas.getBoundingClientRect();
+    let cx = e.touches ? e.touches[0].clientX : e.clientX;
+    let cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: cx - r.left, y: cy - r.top };
 }
 
-function atualizarLucro() {
-    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
+function iniciar(e) {
+    let p = getPos(e);
+    let d = Math.sqrt((p.x - branca.x)**2 + (p.y - branca.y)**2);
+    if (d < 40) { toque.ativo = true; toque.x = p.x; toque.y = p.y; }
 }
+
+function mover(e) { if(toque.ativo) { let p = getPos(e); toque.x = p.x; toque.y = p.y; e.preventDefault(); } }
+
+function disparar() {
+    if(toque.ativo) {
+        branca.vx = (branca.x - toque.x) * 0.13;
+        branca.vy = (branca.y - toque.y) * 0.13;
+        toque.ativo = false;
+    }
+}
+
+canvas.addEventListener("mousedown", iniciar);
+window.addEventListener("mousemove", mover);
+window.addEventListener("mouseup", disparar);
+canvas.addEventListener("touchstart", iniciar, {passive:false});
+window.addEventListener("touchmove", mover, {passive:false});
+window.addEventListener("touchend", disparar);
 
 function selectBet(v, btn) {
     valorAposta = v;
     document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     btn.classList.add('active-bet');
-    atualizarLucro();
+    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
 
 function updateCustom(val) {
     valorAposta = parseFloat(val) || 0;
-    atualizarLucro();
+    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
 
+function confirmBet() {
+    atualizarConfiguracoes();
+    alert("💰 Aposta Confirmada! Boa sorte.");
+}
+
+function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
+
+window.onload = sortearPosicoes;
+</script>
 function abrirModal(tipo) {
     const modal = document.getElementById("modalFinanceiro");
     const cont = document.getElementById("conteudo-modal");
