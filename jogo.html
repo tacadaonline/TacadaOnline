@@ -66,6 +66,27 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+ // FUNÇÃO PARA BUSCAR SALDO REAL NO SERVIDOR
+async function atualizarSaldoVisual() {
+    const user = localStorage.getItem("usuario"); 
+    if (!user) return;
+    
+    try {
+        const res = await fetch(`/get-saldo/${user}`);
+        const data = await res.json();
+        if (data.success) {
+            // Atualiza o texto na tela. O ID deve ser "saldo"
+            const el = document.getElementById("saldo");
+            if(el) el.innerText = `R$ ${data.saldo.toFixed(2)}`;
+        }
+    } catch (err) {
+        console.error("Erro ao sincronizar saldo");
+    }
+}
+
+// ATUALIZAÇÃO AUTOMÁTICA (OPCIONAL: busca a cada 5 segundos)
+setInterval(atualizarSaldoVisual, 5000);
+
 let usuarioLogado = localStorage.getItem("usuario") || "jogador";
 let valorAposta = 10;
 let dificuldadeRTP = 0.95; 
@@ -195,7 +216,7 @@ function abrirModal(t) {
 }
 function fecharModal() { document.getElementById("modalFinanceiro").style.display = "none"; }
 
-window.onload = () => { sortearPosicoes(); desenhar(); };
+window.onload = () => { sortearPosicoes(); desenhar(); atualizarSaldoVisual(); };
 </script>
 </body>
 </html>
