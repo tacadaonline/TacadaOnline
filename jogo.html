@@ -28,8 +28,8 @@
   #canvas-container { position: relative; display: inline-block; margin-top: 10px; }
   canvas { background: radial-gradient(circle, #0e4422 0%, #052b14 100%); border: 10px solid #3e2723; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: block; cursor: none; }
   
-  #aim-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; display: none; z-index: 50; }
-  #aim-guide svg { width: 100%; height: 100%; }
+  #cue-aim { position: absolute; width: 400px; height: 20px; pointer-events: none; display: none; z-index: 50; top: 0; left: 0; }
+  #cue-aim svg { width: 100%; height: 100%; filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8)); }
 
   .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
   .modal-content { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid gold; width: 85%; max-width: 320px; text-align: center; }
@@ -60,34 +60,32 @@
 
 <div id="canvas-container">
   <canvas id="game"></canvas>
-  <div id="aim-guide">
-    <svg viewBox="0 0 300 300">
-      <!-- Linha de mira (cônica) -->
+  <div id="cue-aim">
+    <svg viewBox="0 0 400 20">
+      <!-- Taco (cue) com efeito pontilhado -->
       <defs>
-        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.8" />
-          <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0" />
+        <linearGradient id="cueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#1a0000;stop-opacity:1" />
+          <stop offset="10%" style="stop-color:#2d1b1b;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#8B4513;stop-opacity:0.5" />
         </linearGradient>
       </defs>
       
-      <!-- Linha central -->
-      <line x1="150" y1="0" x2="150" y2="150" stroke="url(#lineGrad)" stroke-width="8" opacity="0.9"/>
+      <!-- Corpo do taco (madeira) -->
+      <rect x="20" y="6" width="360" height="8" fill="url(#cueGrad)" rx="4"/>
       
-      <!-- Círculos concêntricos -->
-      <circle cx="150" cy="150" r="50" fill="none" stroke="#FFD700" stroke-width="2" opacity="0.7"/>
-      <circle cx="150" cy="150" r="35" fill="none" stroke="#FFA500" stroke-width="1.5" opacity="0.6"/>
-      <circle cx="150" cy="150" r="20" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.8"/>
+      <!-- Linha de mira pontilhada no meio -->
+      <line x1="20" y1="10" x2="380" y2="10" stroke="#FFD700" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>
       
-      <!-- Ponto central -->
-      <circle cx="150" cy="150" r="6" fill="#FFD700" opacity="1"/>
-      <circle cx="150" cy="150" r="3" fill="#FFF" opacity="0.9"/>
+      <!-- Ponta do taco (branca) -->
+      <circle cx="15" cy="10" r="4.5" fill="#fff" opacity="0.9"/>
+      <circle cx="15" cy="10" r="3" fill="#f0f0f0" opacity="0.8"/>
       
-      <!-- Marcadores de ângulo -->
-      <g opacity="0.6">
-        <line x1="145" y1="80" x2="155" y2="80" stroke="#FFD700" stroke-width="2"/>
-        <line x1="145" y1="100" x2="155" y2="100" stroke="#FFD700" stroke-width="1.5"/>
-        <line x1="145" y1="120" x2="155" y2="120" stroke="#FFD700" stroke-width="1"/>
-      </g>
+      <!-- Brilho no taco -->
+      <ellipse cx="190" cy="5" rx="80" ry="2" fill="#fff" opacity="0.3"/>
+      
+      <!-- Triângulo de direção na ponta -->
+      <polygon points="12,8 12,12 8,10" fill="#FFD700" opacity="0.7"/>
     </svg>
   </div>
 </div>
@@ -111,12 +109,12 @@ let velocidadeDourada = { x: 0, y: 0 };
 let atrito = 0.995;
 let gameLoopRunning = false;
 let tempoJogo = 0;
-let tempoMaximo = 2.5; // ✅ 2.5 segundos
+let tempoMaximo = 2.5;
 let timerAtivo = false;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const aimGuide = document.getElementById("aim-guide");
+const cueAim = document.getElementById("cue-aim");
 
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
@@ -345,10 +343,10 @@ function atualizarFisica() {
     desenhar();
 }
 
-/* ===== MOVER MIRA =====*/
+/* ===== MOVER TACO (CUE) =====*/
 canvas.addEventListener("mousemove", (e) => {
     if (!jogoAtivo) {
-        aimGuide.style.display = "none";
+        cueAim.style.display = "none";
         return;
     }
     
@@ -356,15 +354,15 @@ canvas.addEventListener("mousemove", (e) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Calcular ângulo da mira
+    // Calcular ângulo do taco
     const dx = x - branca.x;
     const dy = y - branca.y;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     
-    aimGuide.style.display = "block";
-    aimGuide.style.left = branca.x + "px";
-    aimGuide.style.top = branca.y + "px";
-    aimGuide.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+    cueAim.style.display = "block";
+    cueAim.style.left = branca.x + "px";
+    cueAim.style.top = (branca.y - 10) + "px";
+    cueAim.style.transform = `rotate(${angle}deg)`;
 });
 
 canvas.addEventListener("touchmove", (e) => {
@@ -379,14 +377,14 @@ canvas.addEventListener("touchmove", (e) => {
     const dy = y - branca.y;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     
-    aimGuide.style.display = "block";
-    aimGuide.style.left = branca.x + "px";
-    aimGuide.style.top = branca.y + "px";
-    aimGuide.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+    cueAim.style.display = "block";
+    cueAim.style.left = branca.x + "px";
+    cueAim.style.top = (branca.y - 10) + "px";
+    cueAim.style.transform = `rotate(${angle}deg)`;
 });
 
 canvas.addEventListener("mouseleave", () => {
-    aimGuide.style.display = "none";
+    cueAim.style.display = "none";
 });
 
 /* ===== TOQUE NA TELA =====*/
@@ -417,7 +415,7 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 function aplicarForce(x, y) {
-    if (bolaMovida) return; // Só permite um clique
+    if (bolaMovida) return;
     
     const forceX = x - branca.x;
     const forceY = y - branca.y;
@@ -428,7 +426,8 @@ function aplicarForce(x, y) {
         velocidadeBranca.x = (forceX / dist) * force;
         velocidadeBranca.y = (forceY / dist) * force;
         bolaMovida = true;
-        timerAtivo = true; // ✅ Começa o timer aqui!
+        timerAtivo = true;
+        cueAim.style.display = "none";
         console.log("Força aplicada:", velocidadeBranca);
     }
 }
@@ -515,7 +514,7 @@ async function confirmBet() {
 async function finalizarJogo(ganhou) {
     jogoAtivo = false;
     timerAtivo = false;
-    aimGuide.style.display = "none";
+    cueAim.style.display = "none";
 
     if (ganhou) {
         alert("🎉 PARABÉNS! VOCÊ VENCEU! Ganhou R$ " + (valorAposta * 3).toFixed(2));
