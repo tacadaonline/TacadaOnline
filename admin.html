@@ -3,195 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DASHBOARD ELITE - TACADA ONLINE</title>
+    <title>DASHBOARD SUPREMO</title>
     <style>
-        :root { --gold: #ffd700; --dark: #0a0a0a; --gray: #1a1a1a; --blue: #2196F3; --red: #f44336; }
-        body { background: #050505; color: var(--gold); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; margin: 0; }
-        .container { max-width: 1100px; margin: 0 auto; background: #111; border: 1px solid var(--gold); border-radius: 15px; padding: 25px; box-shadow: 0 0 40px rgba(255, 215, 0, 0.05); }
-        
-        /* Stats Cards */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .stat-card { background: var(--gray); padding: 20px; border-radius: 10px; border-bottom: 3px solid var(--gold); text-align: center; }
-        .stat-card small { color: #888; text-transform: uppercase; font-size: 11px; }
-        .stat-card div { font-size: 24px; font-weight: bold; color: #fff; margin-top: 5px; }
-
-        /* Abas */
-        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .tab-btn { background: none; border: 1px solid #333; color: #888; padding: 12px 25px; cursor: pointer; border-radius: 5px; font-weight: bold; }
-        .tab-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
-
-        .tab-content { display: none; animation: fadeIn 0.3s; }
+        :root { --gold: #ffd700; --dark: #0a0a0a; }
+        body { background: #050505; color: var(--gold); font-family: sans-serif; padding: 20px; }
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { background: #222; border: 1px solid #444; color: #888; padding: 10px; cursor: pointer; border-radius: 5px; }
+        .tab-btn.active { background: var(--gold); color: #000; font-weight: bold; }
+        .tab-content { display: none; background: #111; padding: 20px; border-radius: 10px; border: 1px solid var(--gold); }
         .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .section { background: var(--gray); padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .admin-auth { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px dashed var(--gold); }
-        
-        input { padding: 12px; background: #000; border: 1px solid #444; color: #fff; border-radius: 5px; width: 100%; box-sizing: border-box; }
-        .search-box { margin-bottom: 15px; max-width: 300px; }
-
-        table { width: 100%; border-collapse: collapse; background: #000; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #111; }
-        th { background: #1a1a1a; font-size: 12px; text-transform: uppercase; color: var(--gold); }
-        
-        .btn-action { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; margin-right: 5px; }
-        .btn-add { background: var(--blue); color: white; }
-        .btn-zero { background: #333; color: #888; }
-        
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #000; border: 1px solid #444; color: #fff; border-radius: 5px; }
+        button { padding: 10px; background: var(--gold); border: none; cursor: pointer; font-weight: bold; width: 100%; border-radius: 5px; margin-top: 5px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border-bottom: 1px solid #222; text-align: left; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>TACADA ONLINE CONTROL 🎱</h1>
-
-    <div class="admin-auth">
-        <span style="margin-right: 10px;">🔐 CHAVE MESTRA:</span>
-        <input type="password" id="sAdmin" style="max-width: 250px;" placeholder="Digite para liberar o sistema...">
-        <button onclick="carregarGeral()" style="margin-left: 10px; background: #fff; color: #000; padding: 10px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">CONECTAR</button>
-    </div>
-
-    <div class="stats-grid">
-        <div class="stat-card"><small>Banca Total</small><div id="statBanca">R$ 0,00</div></div>
-        <div class="stat-card"><small>Jogadores</small><div id="statUsers">0</div></div>
-        <div class="stat-card"><small>RTP Atual</small><div id="statRtp">0%</div></div>
+    <h2 style="text-align:center">🎱 PAINEL DE CONTROLE</h2>
+    
+    <div style="text-align:center; margin-bottom:20px;">
+        <input type="password" id="sAdmin" style="max-width:300px" placeholder="Senha Mestra">
     </div>
 
     <div class="tab-menu">
-        <button class="tab-btn active" onclick="openTab('config')">⚙️ Configurações</button>
+        <button class="tab-btn active" onclick="openTab('config')">⚙️ Config</button>
         <button class="tab-btn" onclick="openTab('jogadores')">👥 Jogadores</button>
+        <button class="tab-btn" onclick="openTab('saques')">💸 Saques</button>
+        <button class="tab-btn" onclick="openTab('api')">🔑 API Pagamento</button>
     </div>
 
     <div id="config" class="tab-content active">
-        <div class="section">
-            <h3>Controle de Dificuldade (RTP)</h3>
-            <p style="color: #888;">Defina a chance de ganho. (Ex: 0.3 = 30% de chance do jogador vencer)</p>
-            <div style="display: flex; gap: 10px; max-width: 400px;">
-                <input type="number" id="vRtp" step="0.05" min="0" max="1" placeholder="Ex: 0.30">
-                <button onclick="salvarRTP()" style="background: var(--gold); color: #000; border: none; padding: 0 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">SALVAR</button>
-            </div>
-        </div>
+        <h3>Ajustar RTP (0.1 a 0.9)</h3>
+        <input type="number" id="vRtp" step="0.05" placeholder="Ex: 0.30">
+        <button onclick="salvarRTP()">SALVAR DIFICULDADE</button>
     </div>
 
     <div id="jogadores" class="tab-content">
-        <div class="section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3>Lista de Usuários</h3>
-                <input type="text" id="searchUser" class="search-box" placeholder="🔎 Buscar Telefone..." oninput="filtrarUsuarios()">
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Usuário (Telefone)</th>
-                        <th>Saldo Disponível</th>
-                        <th>Ações Rápidas</th>
-                    </tr>
-                </thead>
-                <tbody id="listaCorpo">
-                    <tr><td colspan="3" style="text-align: center; color: #666;">Conecte o sistema para listar...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <h3>Lista de Usuários <button onclick="listarUsers()" style="width:auto; float:right">🔄</button></h3>
+        <table>
+            <thead><tr><th>Usuário</th><th>Saldo</th><th>Afiliado</th></tr></thead>
+            <tbody id="listaUsers"></tbody>
+        </table>
     </div>
-</div>
 
-<script>
-    let usuariosCache = [];
+    <div id="saques" class="tab-content">
+        <h3>Saques Pendentes <button onclick="listarSaques()" style="width:auto; float:right">🔄</button></h3>
+        <table>
+            <thead><tr><th>Usuário</th><th>Valor</th><th>Pix</th><th>Ação</th></tr></thead>
+            <tbody id="listaSaques"></tbody>
+        </table>
+    </div>
 
-    function openTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        event.currentTarget.classList.add('active');
-    }
+    <div id="api" class="tab-content">
+        <h3>Configurar Gateway (Sessão Segura)</h3>
+        <p style="font-size:11px; color:#888">As chaves abaixo somem ao fechar o navegador.</p>
+        <input type="text" id="apiID" placeholder="Client ID">
+        <input type="password" id="apiSec" placeholder="Client Secret">
+        <button onclick="salvarApiLocal()">ATIVAR API NESTA SESSÃO</button>
+    </div>
 
-    async function carregarGeral() {
-        const senha = document.getElementById("sAdmin").value;
-        if(!senha) return alert("Digite a senha!");
-        
-        try {
-            const res = await fetch("/admin/usuarios", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ senha })
-            });
-            const data = await res.json();
-            
-            if(data.success) {
-                usuariosCache = data.usuarios;
-                renderizarTabela(usuariosCache);
-                
-                // Atualiza Stats
-                const totalBanca = usuariosCache.reduce((acc, curr) => acc + curr.saldo, 0);
-                document.getElementById("statBanca").innerText = `R$ ${totalBanca.toFixed(2)}`;
-                document.getElementById("statUsers").innerText = usuariosCache.length;
-                
-                // Pega RTP
-                const rtpRes = await fetch("/admin/get-rtp");
-                const rtpData = await rtpRes.json();
-                document.getElementById("statRtp").innerText = (rtpData.rtp * 100).toFixed(0) + "%";
-            } else { alert("Chave Mestra Inválida!"); }
-        } catch (e) { alert("Erro de conexão com o servidor."); }
-    }
-
-    function renderizarTabela(lista) {
-        const corpo = document.getElementById("listaCorpo");
-        corpo.innerHTML = lista.map(u => `
-            <tr>
-                <td><strong>${u.username}</strong></td>
-                <td style="color: #fff; font-weight: bold;">R$ ${u.saldo.toFixed(2)}</td>
-                <td>
-                    <button class="btn-action btn-add" onclick="alterarSaldo('${u.username}')">ADICIONAR R$</button>
-                    <button class="btn-action btn-zero" onclick="alterarSaldo('${u.username}', true)">ZERAR</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    function filtrarUsuarios() {
-        const termo = document.getElementById("searchUser").value.toLowerCase();
-        const filtrados = usuariosCache.filter(u => u.username.includes(termo));
-        renderizarTabela(filtrados);
-    }
-
-    async function alterarSaldo(user, zerar = false) {
-        const senha = document.getElementById("sAdmin").value;
-        let valor = 0;
-        
-        if(zerar) {
-            if(!confirm(`Deseja zerar o saldo de ${user}?`)) return;
-            const userObj = usuariosCache.find(u => u.username === user);
-            valor = -userObj.saldo;
-        } else {
-            const input = prompt(`Quanto deseja adicionar para ${user}?`);
-            if(!input || isNaN(input)) return;
-            valor = parseFloat(input);
+    <script>
+        function openTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
         }
 
-        try {
-            const res = await fetch("/admin/add-saldo", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ username: user, valor, senha })
-            });
+        async function listarUsers() {
+            const res = await fetch("/admin/usuarios", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ senha: document.getElementById("sAdmin").value })});
             const data = await res.json();
-            if(data.success) carregarGeral();
-        } catch (e) { alert("Erro ao processar."); }
-    }
+            if(data.success) {
+                document.getElementById("listaUsers").innerHTML = data.usuarios.map(u => `<tr><td>${u.username}</td><td>R$ ${u.saldo.toFixed(2)}</td><td>${u.indicadoPor || 'Direto'}</td></tr>`).join('');
+            }
+        }
 
-    async function salvarRTP() {
-        const rtp = document.getElementById("vRtp").value;
-        const senha = document.getElementById("sAdmin").value;
-        const res = await fetch("/admin/set-rtp", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ rtp, senha })
-        });
-        const data = await res.json();
-        alert(data.success ? "🔥 RTP Atualizado!" : "Erro ao salvar.");
-        carregarGeral();
-    }
-</script>
+        async function listarSaques() {
+            const res = await fetch("/admin/saques-pendentes", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ senha: document.getElementById("sAdmin").value })});
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById("listaSaques").innerHTML = data.saques.map(s => `<tr><td>${s.username}</td><td>R$ ${s.valor}</td><td>${s.chavePix}</td><td><button onclick="pagar('${s.chavePix}', ${s.valor})" style="background:green; color:white">PAGAR</button></td></tr>`).join('');
+            }
+        }
+
+        function salvarApiLocal() {
+            sessionStorage.setItem("api_id", document.getElementById("apiID").value);
+            sessionStorage.setItem("api_sec", document.getElementById("apiSec").value);
+            alert("✅ API de Pagamento ativada para esta aba!");
+        }
+
+        function pagar(pix, valor) {
+            const id = sessionStorage.getItem("api_id");
+            if(!id) return alert("❌ Primeiro configure a aba API!");
+            alert(`Processando R$ ${valor} para o PIX ${pix} usando as chaves salvas...`);
+        }
+
+        async function salvarRTP() {
+            const res = await fetch("/admin/set-rtp", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ rtp: document.getElementById("vRtp").value, senha: document.getElementById("sAdmin").value })});
+            const data = await res.json();
+            alert(data.success ? "RTP Alterado!" : "Erro!");
+        }
+    </script>
 </body>
 </html>
