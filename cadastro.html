@@ -2,61 +2,30 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tacada Online - Cadastro</title>
     <style>
-        /* O estilo é IDENTICO ao login para manter a marca */
-        body { background-color: #0d0d0d; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        
-        /* AJUSTE: Removido height fixo para o banner seguir a imagem */
-        .banner { 
-            width: 100%; 
-            max-width: 400px; 
-            border: 2px solid #d4af37; 
-            border-radius: 15px 15px 0 0; 
-            overflow: hidden; 
-            display: flex; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
-        }
-        
-        /* AJUSTE: height auto garante a proporção correta */
-        .banner img { 
-            width: 100%; 
-            height: auto; 
-            display: block;
-            opacity: 0.9; 
-        }
-
-        .login-container { width: 90%; max-width: 400px; background: #1a1a1a; padding: 30px; border-radius: 0 0 15px 15px; border: 2px solid #d4af37; border-top: none; box-sizing: border-box; }
-        h2 { color: #d4af37; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; }
-        input { 
-            width: 100%; 
-            padding: 14px; 
-            margin: 10px 0; 
-            background: #262626; 
-            border: 1px solid #444; 
-            border-radius: 8px; 
-            color: white; 
-            box-sizing: border-box;
-            font-size: 16px;
-            font-family: inherit;
-        }
-        button { width: 100%; padding: 15px; margin-top: 15px; background: linear-gradient(to right, #d4af37, #f2d06b); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        button:hover { opacity: 0.9; }
-        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; }
+        body { background-color: #0d0d0d; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .banner { width: 100%; max-width: 400px; border: 2px solid #d4af37; border-radius: 15px 15px 0 0; overflow: hidden; display: flex; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .banner img { width: 100%; height: auto; display: block; opacity: 0.9; }
+        .login-container { width: 90%; max-width: 400px; background: #1a1a1a; padding: 30px; border-radius: 0 0 15px 15px; border: 2px solid #d4af37; border-top: none; box-sizing: border-box; text-align: center; }
+        h2 { color: #d4af37; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; font-size: 20px; }
+        input { width: 100%; padding: 14px; margin: 10px 0; background: #262626; border: 1px solid #444; border-radius: 8px; color: white; box-sizing: border-box; font-size: 16px; }
+        .btn-cad { width: 100%; padding: 15px; margin-top: 15px; background: linear-gradient(to right, #d4af37, #f2d06b); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; text-transform: uppercase; }
         .footer-link { margin-top: 15px; font-size: 13px; color: #888; }
-        .footer-link a { color: #d4af37; text-decoration: none; }
+        .footer-link a { color: #d4af37; text-decoration: none; font-weight: bold; }
+        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; color: #ff4d4d; }
     </style>
 </head>
 <body>
     <div class="banner">
-        <img src="https://i.ibb.co/sdDZVTpk/29282366-d3a9-4b73-bf93-06d065467b0c.jpg" alt="Banner">
+        <img src="https://i.ibb.co" alt="Banner">
     </div>
     <div class="login-container">
         <h2>Criar Conta</h2>
         <input type="text" id="user" placeholder="Digite Seu Telefone">
         <input type="password" id="pass" placeholder="Crie uma Senha">
-        <button onclick="cadastrar()">Finalizar Cadastro</button>
+        <button class="btn-cad" id="btnCadastrar" onclick="cadastrar()">Finalizar Cadastro</button>
         <div id="erro"></div>
         <div class="footer-link">Já tem conta? <a href="index.html">Faça Login</a></div>
     </div>
@@ -66,30 +35,40 @@
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value.trim();
             const erroEl = document.getElementById('erro');
+            const btn = document.getElementById('btnCadastrar');
 
             if (user.length < 3 || pass.length < 3) {
-                erroEl.style.color = "#ff4d4d";
                 erroEl.innerText = "Mínimo de 3 caracteres.";
                 return;
             }
 
-            const url = "/register"; 
+            btn.disabled = true;
+            btn.innerText = "PROCESSANDO...";
+            erroEl.innerText = "";
+
             try {
-                const response = await fetch(url, {
+                // Rota atualizada para bater com o server.js
+                const response = await fetch("/api/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username: user, password: pass })
                 });
+                
                 const data = await response.json();
+                
                 if (data.success) {
-                    alert("Cadastro realizado! Agora faça o login.");
-                    window.location.href = "/";
+                    alert("✅ Cadastro realizado com sucesso! Faça seu login.");
+                    window.location.href = "index.html"; 
                 } else {
-                    erroEl.style.color = "#ff4d4d";
-                    erroEl.innerText = data.msg;
+                    erroEl.innerText = data.message || data.msg || "Usuário já existe.";
+                    btn.disabled = false;
+                    btn.innerText = "FINALIZAR CADASTRO";
                 }
             } catch (err) {
-                erroEl.innerText = "Erro ao cadastrar.";
+                console.error("Erro no cadastro:", err);
+                erroEl.innerText = "Erro de conexão. Verifique o servidor.";
+                btn.disabled = false;
+                btn.innerText = "FINALIZAR CADASTRO";
             }
         }
     </script>
