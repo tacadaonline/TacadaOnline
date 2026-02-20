@@ -327,6 +327,9 @@ canvas.addEventListener("touchstart", (e) => {
     if (!jogoAtivo || bolaMovida) return;
     
     e.preventDefault();
+
+    // --- O CRONÔMETRO COMEÇA AQUI (AO ENCOSTAR) ---
+    timerAtivo = true; 
     
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
