@@ -1,25 +1,24 @@
-require('dotenv').config(); // 1. CARREGA O DOTENV NO TOPO
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const axios = require("axios");
 
 const app = express();
 
+// --- CONFIGURAÇÕES INICIAIS ---
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
-// 2. USE AS VARIÁVEIS DO .env PARA SEGURANÇA
-const SUITPAY_ID = process.env.SUITPAY_ID;
-const SUITPAY_SECRET = process.env.SUITPAY_SECRET;
+// VARIÁVEIS DE AMBIENTE (Configure no painel do Render)
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
 
-let globalRTP = 0.95; 
+let globalRTP = 0.30; // 30% de chance de vitória (ajuste conforme desejar)
 
+// --- CONEXÃO BANCO DE DADOS ---
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ BANCO CONECTADO!"))
     .catch(err => console.error("❌ ERRO BANCO:", err));
@@ -31,7 +30,63 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model("User", UserSchema);
 
-// --- ✅ LOGICA DE APOSTA SEGURA (SERVER-SIDE) ---
+// --- 🔐 ROTA DE CADASTRO ---
+app.post("/api/register", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const userLower = username.trim().toLowerCase();
+        
+        const existe = await User.findOne({ username: userLower });
+        if (existe) return res.status(400).json({ success: false, message: "Usuário já cadastrado!" });
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const novoUsuario = new User({ username: userLower, password: hashedPassword, saldo: 0 });
+        await novoUsuario.save();
+        
+        res.json({ success: true, message: "Cadastro realizado!" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Erro ao cadastrar." });
+    }
+});
+
+// --- 🔑 ROTA DE LOGIN ---
+app.post("/api/login", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ success: false, message: "Dados incompletos" });
+
+        const userLower = username.trim().toLowerCase();
+        const usuario = await User.findOne({ username: userLower });
+        
+        if (!usuario) return res.status(400).json({ success: false, message: "Usuário não encontrado." });
+
+        const senhaValida = await bcrypt.compare(password, usuario.password);
+        if (!senhaValida) return res.status(400).json({ success: false, message: "Senha incorreta." });
+
+        res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Erro interno no servidor." });
+    }
+});
+
+// --- 💰 ROTA DE SALDO ---
+app.get("/api/saldo", async (req, res) => {
+    try {
+        const { user } = req.query;
+        if (!user) return res.status(400).json({ success: false });
+        
+        const usuario = await User.findOne({ username: user.trim().toLowerCase() });
+        if (!usuario) return res.status(404).json({ success: false });
+        
+        res.json({ success: true, saldo: usuario.saldo });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- 🎲 LÓGICA DE APOSTA (SERVER-SIDE) ---
 app.post("/api/aposta", async (req, res) => {
     try {
         const { username, valor } = req.body;
@@ -46,20 +101,14 @@ app.post("/api/aposta", async (req, res) => {
             return res.status(400).json({ success: false, message: "Saldo insuficiente" });
         }
 
-        // --- 🎲 O SERVIDOR DECIDE O RESULTADO (ANTI-HACK) ---
-        const sorteio = Math.random();
-        const ganhou = sorteio < globalRTP; // Se RTP é 0.95, tem 95% de chance de "retorno"
+        // SORTEIO RTP
+        const ganhou = Math.random() < globalRTP;
         
-        let mudancaSaldo = -valorAposta;
-        let resultadoTexto = "perdeu";
+        // Se o jogo é 3.0x: se ele ganha, recebe o valor da aposta * 3.
+        // Como o saldo vai ser atualizado, o lucro real adicionado é (valor * 2).
+        // Se perde, removemos o valor da aposta.
+        let mudancaSaldo = ganhou ? (valorAposta * 2) : -valorAposta;
 
-        if (ganhou) {
-            // Exemplo: se ganhar, dobra o valor (ajuste conforme seu jogo)
-            mudancaSaldo = valorAposta * 3; 
-            resultadoTexto = "ganhou";
-        }
-
-        // Atualiza o saldo de forma atômica para evitar bugs de concorrência
         const usuarioAtualizado = await User.findOneAndUpdate(
             { username: username.trim().toLowerCase() },
             { $inc: { saldo: mudancaSaldo } },
@@ -69,7 +118,6 @@ app.post("/api/aposta", async (req, res) => {
         res.json({ 
             success: true, 
             saldo: usuarioAtualizado.saldo,
-            resultado: resultadoTexto,
             ganhou: ganhou
         });
 
@@ -78,7 +126,12 @@ app.post("/api/aposta", async (req, res) => {
     }
 });
 
-// --- ADMIN E OUTROS (MANTIDOS COM SEGURANÇA) ---
+// --- ⚙️ ADMIN RTP ---
+app.get("/admin/get-rtp", (req, res) => {
+    res.json({ rtp: globalRTP });
+});
+
+// --- 📥 ADICIONAR SALDO (ADMIN) ---
 app.post("/admin/add-saldo", async (req, res) => {
     const { username, valor, senha } = req.body;
     if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
@@ -91,6 +144,8 @@ app.post("/admin/add-saldo", async (req, res) => {
     res.json({ success: true, novoSaldo: usuario?.saldo });
 });
 
-// ... (Mantenha as rotas de Login e Register que já usam bcrypt)
-
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("🚀 BACKEND SEGURO RODANDO"));
+// --- INICIALIZAÇÃO ---
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 SERVIDOR TACADA ONLINE RODANDO NA PORTA ${PORT}`);
+});
