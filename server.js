@@ -6,146 +6,108 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const app = express();
-
-// --- CONFIGURAÇÕES INICIAIS ---
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
-// VARIÁVEIS DE AMBIENTE (Configure no painel do Render)
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
+let globalRTP = 0.30; 
 
-let globalRTP = 0.30; // 30% de chance de vitória (ajuste conforme desejar)
+mongoose.connect(MONGO_URI).then(() => console.log("✅ BANCO CONECTADO")).catch(err => console.error("❌ ERRO BANCO:", err));
 
-// --- CONEXÃO BANCO DE DADOS ---
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ BANCO CONECTADO!"))
-    .catch(err => console.error("❌ ERRO BANCO:", err));
-
+// --- SCHEMAS ---
 const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true, trim: true },
+    username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    saldo: { type: Number, default: 0 }
+    saldo: { type: Number, default: 0 },
+    indicadoPor: { type: String, default: null },
+    comissao: { type: Number, default: 0 }
 });
 const User = mongoose.model("User", UserSchema);
 
-// --- 🔐 ROTA DE CADASTRO ---
+const SaqueSchema = new mongoose.Schema({
+    username: String,
+    valor: Number,
+    chavePix: String,
+    status: { type: String, default: "pendente" },
+    data: { type: Date, default: Date.now }
+});
+const Saque = mongoose.model("Saque", SaqueSchema);
+
+// --- ROTAS DE JOGO E USUÁRIO ---
 app.post("/api/register", async (req, res) => {
     try {
-        const { username, password } = req.body;
-        const userLower = username.trim().toLowerCase();
-        
-        const existe = await User.findOne({ username: userLower });
-        if (existe) return res.status(400).json({ success: false, message: "Usuário já cadastrado!" });
-
+        const { username, password, ref } = req.body;
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        const novoUsuario = new User({ username: userLower, password: hashedPassword, saldo: 0 });
-        await novoUsuario.save();
-        
-        res.json({ success: true, message: "Cadastro realizado!" });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Erro ao cadastrar." });
-    }
+        const novo = new User({ username: username.trim().toLowerCase(), password: hashedPassword, indicadoPor: ref || null });
+        await novo.save();
+        res.json({ success: true });
+    } catch (err) { res.status(400).json({ success: false }); }
 });
 
-// --- 🔑 ROTA DE LOGIN ---
 app.post("/api/login", async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        if (!username || !password) return res.status(400).json({ success: false, message: "Dados incompletos" });
-
-        const userLower = username.trim().toLowerCase();
-        const usuario = await User.findOne({ username: userLower });
-        
-        if (!usuario) return res.status(400).json({ success: false, message: "Usuário não encontrado." });
-
-        const senhaValida = await bcrypt.compare(password, usuario.password);
-        if (!senhaValida) return res.status(400).json({ success: false, message: "Senha incorreta." });
-
-        res.json({ success: true, username: usuario.username, saldo: usuario.saldo });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Erro interno no servidor." });
+    const { username, password } = req.body;
+    const user = await User.findOne({ username: username.trim().toLowerCase() });
+    if (user && await bcrypt.compare(password, user.password)) {
+        return res.json({ success: true, username: user.username, saldo: user.saldo });
     }
+    res.status(400).json({ success: false });
 });
 
-// --- 💰 ROTA DE SALDO ---
-app.get("/api/saldo", async (req, res) => {
-    try {
-        const { user } = req.query;
-        if (!user) return res.status(400).json({ success: false });
-        
-        const usuario = await User.findOne({ username: user.trim().toLowerCase() });
-        if (!usuario) return res.status(404).json({ success: false });
-        
-        res.json({ success: true, saldo: usuario.saldo });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
-
-// --- 🎲 LÓGICA DE APOSTA (SERVER-SIDE) ---
 app.post("/api/aposta", async (req, res) => {
-    try {
-        const { username, valor } = req.body;
-        const valorAposta = parseFloat(valor);
+    const { username, valor } = req.body;
+    const user = await User.findOne({ username: username.trim().toLowerCase() });
+    if (!user || user.saldo < valor) return res.status(400).json({ success: false });
 
-        if (!username || isNaN(valorAposta) || valorAposta <= 0) {
-            return res.status(400).json({ success: false, message: "Dados inválidos" });
-        }
+    const ganhou = Math.random() < globalRTP;
+    let mudanca = ganhou ? (valor * 2) : -valor;
 
-        const usuario = await User.findOne({ username: username.trim().toLowerCase() });
-        if (!usuario || usuario.saldo < valorAposta) {
-            return res.status(400).json({ success: false, message: "Saldo insuficiente" });
-        }
-
-        // SORTEIO RTP
-        const ganhou = Math.random() < globalRTP;
-        
-        // Se o jogo é 3.0x: se ele ganha, recebe o valor da aposta * 3.
-        // Como o saldo vai ser atualizado, o lucro real adicionado é (valor * 2).
-        // Se perde, removemos o valor da aposta.
-        let mudancaSaldo = ganhou ? (valorAposta * 2) : -valorAposta;
-
-        const usuarioAtualizado = await User.findOneAndUpdate(
-            { username: username.trim().toLowerCase() },
-            { $inc: { saldo: mudancaSaldo } },
-            { new: true }
-        );
-
-        res.json({ 
-            success: true, 
-            saldo: usuarioAtualizado.saldo,
-            ganhou: ganhou
-        });
-
-    } catch (err) { 
-        res.status(500).json({ success: false, message: "Erro interno no servidor" }); 
+    if (!ganhou && user.indicadoPor) {
+        await User.findOneAndUpdate({ username: user.indicadoPor }, { $inc: { comissao: valor * 0.10 } });
     }
+
+    const atualizado = await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: mudanca } }, { new: true });
+    res.json({ success: true, saldo: atualizado.saldo, ganhou });
 });
 
-// --- ⚙️ ADMIN RTP ---
-app.get("/admin/get-rtp", (req, res) => {
-    res.json({ rtp: globalRTP });
+// NOVO: ROTA PARA JOGADOR SOLICITAR SAQUE
+app.post("/api/solicitar-saque", async (req, res) => {
+    const { username, valor, pix } = req.body;
+    const user = await User.findOne({ username: username.trim().toLowerCase() });
+    if (!user || user.saldo < valor) return res.status(400).json({ success: false });
+
+    await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: -valor } });
+    await new Saque({ username: user.username, valor, chavePix: pix }).save();
+    res.json({ success: true });
 });
 
-// --- 📥 ADICIONAR SALDO (ADMIN) ---
+// --- ROTAS ADMIN ---
+app.post("/admin/usuarios", async (req, res) => {
+    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
+    res.json({ success: true, usuarios: users });
+});
+
+app.post("/admin/saques-pendentes", async (req, res) => {
+    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    const saques = await Saque.find({ status: "pendente" });
+    res.json({ success: true, saques });
+});
+
+app.post("/admin/set-rtp", (req, res) => {
+    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    globalRTP = parseFloat(req.body.rtp);
+    res.json({ success: true });
+});
+
+app.get("/admin/get-rtp", (req, res) => res.json({ rtp: globalRTP }));
+
 app.post("/admin/add-saldo", async (req, res) => {
-    const { username, valor, senha } = req.body;
-    if (senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    
-    const usuario = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase() }, 
-        { $inc: { saldo: parseFloat(valor) } }, 
-        { new: true }
-    );
-    res.json({ success: true, novoSaldo: usuario?.saldo });
+    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    await User.findOneAndUpdate({ username: req.body.username }, { $inc: { saldo: parseFloat(req.body.valor) } });
+    res.json({ success: true });
 });
 
-// --- INICIALIZAÇÃO ---
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SERVIDOR TACADA ONLINE RODANDO NA PORTA ${PORT}`);
-});
+app.listen(process.env.PORT || 10000, '0.0.0.0');
