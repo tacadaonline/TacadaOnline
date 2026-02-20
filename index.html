@@ -2,101 +2,30 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tacada Online - Login</title>
     <style>
-        body { 
-            background-color: #0d0d0d; 
-            color: #ffffff; 
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-
-        /* Banner Ajustado Automaticamente */
-        .banner {
-            width: 100%;
-            max-width: 400px;
-            border: 2px solid #d4af37;
-            border-radius: 15px 15px 0 0;
-            overflow: hidden;
-            display: flex;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-        }
-
-        .banner img {
-            width: 100%;
-            height: auto; /* Ajuste automático conforme a imagem */
-            display: block;
-            opacity: 0.9;
-        }
-
-        .login-container { 
-            width: 90%;
-            max-width: 400px;
-            background: #1a1a1a;
-            padding: 30px;
-            border-radius: 0 0 15px 15px;
-            border: 2px solid #d4af37;
-            border-top: none;
-            box-sizing: border-box;
-            text-align: center;
-        }
-
-        input { 
-            width: 100%; 
-            padding: 14px; 
-            margin: 10px 0; 
-            background: #262626;
-            border: 1px solid #444;
-            border-radius: 8px; 
-            color: white;
-            box-sizing: border-box;
-        }
-
-        .btn-login { 
-            width: 100%; 
-            padding: 15px; 
-            background: linear-gradient(to right, #d4af37, #f2d06b);
-            color: #000;
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            font-size: 18px;
-            text-transform: uppercase;
-        }
-
-        .btn-cadastrar {
-            width: 100%;
-            padding: 12px;
-            margin-top: 15px;
-            background: transparent;
-            color: #d4af37;
-            border: 1px solid #d4af37;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; }
+        body { background-color: #0d0d0d; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .banner { width: 100%; max-width: 400px; border: 2px solid #d4af37; border-radius: 15px 15px 0 0; overflow: hidden; display: flex; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .banner img { width: 100%; height: auto; display: block; opacity: 0.9; }
+        .login-container { width: 90%; max-width: 400px; background: #1a1a1a; padding: 30px; border-radius: 0 0 15px 15px; border: 2px solid #d4af37; border-top: none; box-sizing: border-box; text-align: center; }
+        input { width: 100%; padding: 14px; margin: 10px 0; background: #262626; border: 1px solid #444; border-radius: 8px; color: white; box-sizing: border-box; font-size: 16px; }
+        .btn-login { width: 100%; padding: 15px; background: linear-gradient(to right, #d4af37, #f2d06b); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 18px; text-transform: uppercase; }
+        .btn-cadastrar { width: 100%; padding: 12px; margin-top: 15px; background: transparent; color: #d4af37; border: 1px solid #d4af37; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; color: #ff4d4d; }
     </style>
 </head>
 <body>
 
     <div class="banner">
-        <img src="https://i.ibb.co/bMQH4hsn/27-CF7-F3-E-937-C-4021-8-EEB-BFF4388-DB157.png" alt="Banner Tacada">
+        <img src="https://i.ibb.co" alt="Banner Tacada">
     </div>
 
     <div class="login-container">
         <input type="text" id="user" placeholder="Digite Seu Telefone">
         <input type="password" id="pass" placeholder="Senha">
         
-        <button class="btn-login" onclick="fazerLogin()">Entrar na Partida</button>
+        <button class="btn-login" id="btnEntrar" onclick="fazerLogin()">Entrar na Partida</button>
         
         <button class="btn-cadastrar" onclick="window.location.href='cadastro.html'">
             Criar Nova Conta
@@ -110,15 +39,20 @@
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value.trim();
             const erroEl = document.getElementById('erro');
+            const btn = document.getElementById('btnEntrar');
 
             if (!user || !pass) {
-                erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = "Preencha os campos!";
+                erroEl.innerText = "Preencha todos os campos!";
                 return;
             }
 
+            btn.disabled = true;
+            btn.innerText = "AUTENTICANDO...";
+            erroEl.innerText = "";
+
             try {
-                const response = await fetch("/login", {
+                // Tenta primeiro a rota /api/login, se falhar tenta /login
+                const response = await fetch("/api/login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username: user, password: pass })
@@ -127,26 +61,25 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // SALVANDO DADOS PARA O JOGO USAR
-                    localStorage.setItem("usuario", user);
-                    localStorage.setItem("saldo", data.saldo);
+                    // Limpa dados antigos e salva os novos
+                    localStorage.clear();
+                    localStorage.setItem("usuario", user.toLowerCase());
+                    localStorage.setItem("saldo", data.saldo || 0);
                     
-                    window.location.href = "/jogo.html"; // Redireciona para o jogo
+                    // Redireciona usando caminho relativo para evitar erro no Render
+                    window.location.href = "jogo.html"; 
                 } else {
-                    erroEl.style.color = "#ff4d4d";
-                    erroEl.innerText = data.msg || "Usuário ou senha incorretos.";
+                    erroEl.innerText = data.message || data.msg || "Usuário ou senha incorretos.";
+                    btn.disabled = false;
+                    btn.innerText = "ENTRAR NA PARTIDA";
                 }
             } catch (err) {
-                erroEl.style.color = "#ff4d4d";
-                erroEl.innerText = "Erro ao conectar com o servidor.";
+                console.error("Erro no login:", err);
+                erroEl.innerText = "Erro de conexão. Verifique o servidor.";
+                btn.disabled = false;
+                btn.innerText = "ENTRAR NA PARTIDA";
             }
         }
     </script>
 </body>
 </html>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<style>
-input {
-    font-size: 16px;
-}
-</style>
