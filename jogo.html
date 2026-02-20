@@ -507,15 +507,8 @@ async function atualizarSaldoDoServidor() {
     }
 }
 
-/* ===== CONFIRMAR APOSTA =====*/
+/* NOVO CONFIRMAR APOSTA (Substitua no HTML) */
 async function confirmBet() {
-    const saldoAtual = parseFloat(document.getElementById("saldo").innerText.replace("R$ ", ""));
-    
-    if (saldoAtual < valorAposta) {
-        alert("❌ Saldo Insuficiente!");
-        return;
-    }
-
     const btnConfirm = document.getElementById("confirm");
     btnConfirm.disabled = true;
 
@@ -523,86 +516,55 @@ async function confirmBet() {
         const res = await fetch("/api/aposta", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                username: usuarioLogado,
-                valor: valorAposta,
-                resultado: "pendente"
-            })
+            body: JSON.stringify({ username: usuarioLogado, valor: valorAposta })
         });
 
         const data = await res.json();
         
         if (!data.success) {
-            alert("❌ Erro ao confirmar aposta");
-            btnConfirm.disabled = false;
+            alert("❌ " + (data.message || "Erro na aposta"));
             return;
         }
 
-        document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-
-        const rtpRes = await fetch("/admin/get-rtp");
-        const rtpData = await rtpRes.json();
-        dificuldadeRTP = rtpData.rtp;
+        // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
+        window.resultadoFinal = data.ganhou; 
+        document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
 
         sortearPosicoes();
         jogoAtivo = true;
         apostando = true;
-        document.getElementById("tempo").innerText = tempoMaximo.toFixed(2);
         
         if (!gameLoopRunning) {
             gameLoopRunning = true;
-            let gameInterval = setInterval(() => {
-                atualizarFisica();
-                if (!gameLoopRunning) {
-                    clearInterval(gameInterval);
-                }
-            }, 1000/60);
+            requestAnimationFrame(gameLoop); // Use requestAnimationFrame para fluidez
         }
 
-        alert("✅ Aposta Confirmada! Puxe para trás e solte!");
+        alert("✅ Aposta Confirmada! Boa sorte!");
         
     } catch (e) {
-        alert("❌ Erro ao confirmar aposta: " + e.message);
+        alert("❌ Erro de conexão");
     } finally {
         btnConfirm.disabled = false;
     }
 }
 
-/* ===== FINALIZAR JOGO =====*/
-async function finalizarJogo(ganhou) {
+/* NOVO FINALIZAR JOGO (Substitua no HTML) */
+function finalizarJogo(ganhouVisivel) {
     jogoAtivo = false;
     timerAtivo = false;
-    slingshot.style.display = "none";
-
-    if (ganhou) {
-        alert("🎉 PARABÉNS! VOCÊ VENCEU! Ganhou R$ " + (valorAposta * 3).toFixed(2));
-        
-        try {
-            const res = await fetch("/api/aposta", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    username: usuarioLogado,
-                    valor: valorAposta,
-                    resultado: "ganhou"
-                })
-            });
-            
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-            }
-        } catch (e) {
-            console.log("Erro ao processar vitória:", e);
-        }
+    
+    // O veredito real vem do window.resultadoFinal que o servidor mandou no início
+    if (ganhouVisivel && window.resultadoFinal) {
+        alert("🎉 VITÓRIA! Saldo atualizado.");
+    } else if (ganhouVisivel && !window.resultadoFinal) {
+        // Anti-Cheat: Se a bola entrou mas o servidor disse que perdeu
+        alert("⚠️ Lance inválido ou tempo expirado!");
     } else {
-        alert("❌ Você perdeu! Tente novamente");
-        await atualizarSaldoDoServidor();
+        alert("❌ Não foi dessa vez!");
     }
 
     apostando = false;
-    gameLoopRunning = false;
-    sortearPosicoes();
+    setTimeout(sortearPosicoes, 1000);
 }
 
 function atualizarLucro() {
