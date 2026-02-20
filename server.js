@@ -55,7 +55,7 @@ app.post("/api/aposta", async (req, res) => {
 
         if (ganhou) {
             // Exemplo: se ganhar, dobra o valor (ajuste conforme seu jogo)
-            mudancaSaldo = valorAposta * 2; 
+            mudancaSaldo = valorAposta * 3; 
             resultadoTexto = "ganhou";
         }
 
