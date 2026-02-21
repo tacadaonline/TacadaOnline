@@ -86,6 +86,9 @@ let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
 
+const CANVAS_BORDER_WIDTH = 10; // canvas CSS border (px), used to sync SVG overlay coordinates
+const BALANCE_SYNC_COOLDOWN_MS = 10000; // ms to block interval sync after a bet response
+
 // Variáveis para o estilingue
 let touchStartX = 0;
 let touchStartY = 0;
@@ -335,6 +338,7 @@ canvas.addEventListener("touchstart", (e) => {
     touchStartX = touch.clientX - rect.left;
     touchStartY = touch.clientY - rect.top;
     isTouching = true;
+    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -371,11 +375,11 @@ canvas.addEventListener("touchmove", (e) => {
         const lineLength = distToBall + 15; // Passa 15px além da bola dourada
         const endX = branca.x + (invertedX * normalized * lineLength);
         const endY = branca.y + (invertedY * normalized * lineLength);
-        
-        aimLine.setAttribute("x1", branca.x);
-        aimLine.setAttribute("y1", branca.y);
-        aimLine.setAttribute("x2", endX);
-        aimLine.setAttribute("y2", endY);
+        const border = CANVAS_BORDER_WIDTH;
+        aimLine.setAttribute("x1", branca.x + border);
+        aimLine.setAttribute("y1", branca.y + border);
+        aimLine.setAttribute("x2", endX + border);
+        aimLine.setAttribute("y2", endY + border);
     }
 });
 
@@ -427,6 +431,7 @@ canvas.addEventListener("mousedown", (e) => {
     touchStartY = e.clientY - rect.top;
     isTouching = true;
     mousePressed = true;
+    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -455,11 +460,11 @@ document.addEventListener("mousemove", (e) => {
         const lineLength = distToBall + 15;
         const endX = branca.x + (invertedX * normalized * lineLength);
         const endY = branca.y + (invertedY * normalized * lineLength);
-        
-        aimLine.setAttribute("x1", branca.x);
-        aimLine.setAttribute("y1", branca.y);
-        aimLine.setAttribute("x2", endX);
-        aimLine.setAttribute("y2", endY);
+        const border = CANVAS_BORDER_WIDTH;
+        aimLine.setAttribute("x1", branca.x + border);
+        aimLine.setAttribute("y1", branca.y + border);
+        aimLine.setAttribute("x2", endX + border);
+        aimLine.setAttribute("y2", endY + border);
     }
 });
 
@@ -497,8 +502,8 @@ document.addEventListener("mouseup", (e) => {
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
-    // Skip interval update if a bet response recently updated the balance (within 3 seconds)
-    if (Date.now() - lastBetTimestamp < 3000) return;
+    // Skip interval update if a bet response recently updated the balance (within 10 seconds)
+    if (Date.now() - lastBetTimestamp < BALANCE_SYNC_COOLDOWN_MS) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
@@ -568,11 +573,8 @@ function finalizarJogo(ganhouVisivel) {
     timerAtivo = false;
     
     // O veredito real vem do window.resultadoFinal que o servidor mandou no início
-    if (ganhouVisivel && window.resultadoFinal) {
+    if (window.resultadoFinal) {
         alert("🎉 VITÓRIA! Saldo atualizado.");
-    } else if (ganhouVisivel && !window.resultadoFinal) {
-        // Anti-Cheat: Se a bola entrou mas o servidor disse que perdeu
-        alert("⚠️ Lance inválido ou tempo expirado!");
     } else {
         alert("❌ Não foi dessa vez!");
     }
