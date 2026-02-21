@@ -36,6 +36,19 @@ const SaqueSchema = new mongoose.Schema({
 const Saque = mongoose.model("Saque", SaqueSchema);
 
 // --- ROTAS DE JOGO E USUÁRIO ---
+
+// >>> ADICIONEI ESTA ROTA ABAIXO PARA O PASSO 1 <<<
+app.get("/api/usuario/:username", async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username.trim().toLowerCase() });
+        if (user) {
+            res.json({ success: true, saldo: user.saldo });
+        } else {
+            res.status(404).json({ success: false });
+        }
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 app.post("/api/register", async (req, res) => {
     try {
         const { username, password, ref } = req.body;
@@ -72,7 +85,6 @@ app.post("/api/aposta", async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo, ganhou });
 });
 
-// NOVO: ROTA PARA JOGADOR SOLICITAR SAQUE
 app.post("/api/solicitar-saque", async (req, res) => {
     const { username, valor, pix } = req.body;
     const user = await User.findOne({ username: username.trim().toLowerCase() });
@@ -106,7 +118,11 @@ app.get("/admin/get-rtp", (req, res) => res.json({ rtp: globalRTP }));
 
 app.post("/admin/add-saldo", async (req, res) => {
     if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    await User.findOneAndUpdate({ username: req.body.username }, { $inc: { saldo: parseFloat(req.body.valor) } });
+    // Adicionei .trim().toLowerCase() para garantir que ache o usuário corretamente
+    await User.findOneAndUpdate(
+        { username: req.body.username.trim().toLowerCase() }, 
+        { $inc: { saldo: parseFloat(req.body.valor) } }
+    );
     res.json({ success: true });
 });
 
