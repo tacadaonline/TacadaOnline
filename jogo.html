@@ -81,6 +81,7 @@ let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
 let atrito = 0.995;
 let gameLoopRunning = false;
+let lastBetTimestamp = 0;
 let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
@@ -496,6 +497,8 @@ document.addEventListener("mouseup", (e) => {
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
+    // Skip interval update if a bet response recently updated the balance (within 3 seconds)
+    if (Date.now() - lastBetTimestamp < 3000) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
@@ -504,6 +507,14 @@ async function atualizarSaldoDoServidor() {
         }
     } catch (e) {
         console.log("Erro ao buscar saldo:", e);
+    }
+}
+
+/* ===== GAME LOOP =====*/
+function gameLoop() {
+    atualizarFisica();
+    if (gameLoopRunning) {
+        requestAnimationFrame(gameLoop);
     }
 }
 
@@ -523,11 +534,13 @@ async function confirmBet() {
         
         if (!data.success) {
             alert("❌ " + (data.message || "Erro na aposta"));
+            btnConfirm.disabled = false;
             return;
         }
 
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou; 
+        lastBetTimestamp = Date.now();
         document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
 
         sortearPosicoes();
@@ -536,15 +549,16 @@ async function confirmBet() {
         
         if (!gameLoopRunning) {
             gameLoopRunning = true;
-            requestAnimationFrame(gameLoop); // Use requestAnimationFrame para fluidez
+            requestAnimationFrame(gameLoop);
         }
 
         alert("✅ Aposta Confirmada! Boa sorte!");
         
     } catch (e) {
         alert("❌ Erro de conexão");
-    } finally {
-        btnConfirm.disabled = false;
+        if (!gameLoopRunning) {
+            btnConfirm.disabled = false;
+        }
     }
 }
 
@@ -564,6 +578,8 @@ function finalizarJogo(ganhouVisivel) {
     }
 
     apostando = false;
+    gameLoopRunning = false;
+    document.getElementById("confirm").disabled = false;
     setTimeout(sortearPosicoes, 1000);
 }
 
