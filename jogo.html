@@ -494,6 +494,14 @@ document.addEventListener("mouseup", (e) => {
     isTouching = false;
 });
 
+/* ===== GAME LOOP =====*/
+function gameLoop() {
+    atualizarFisica();
+    if (gameLoopRunning) {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
     try {
