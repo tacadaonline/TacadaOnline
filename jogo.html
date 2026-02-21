@@ -81,6 +81,9 @@ let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
 let atrito = 0.995;
 let gameLoopRunning = false;
+let ultimaAtualizacaoAposta = 0;
+const BALANCE_SYNC_INTERVAL_MS = 5000;
+const BALANCE_UPDATE_COOLDOWN_MS = 6000;
 let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
@@ -506,6 +509,7 @@ function gameLoop() {
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
+    if (Date.now() - ultimaAtualizacaoAposta < BALANCE_UPDATE_COOLDOWN_MS) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
@@ -539,6 +543,7 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou; 
         document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
+        ultimaAtualizacaoAposta = Date.now();
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -635,8 +640,7 @@ function fecharModal() {
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
-    atualizarSaldoDoServidor();
-    setInterval(atualizarSaldoDoServidor, 5000);
+    setInterval(atualizarSaldoDoServidor, BALANCE_SYNC_INTERVAL_MS);
 };
 </script>
 </body>
