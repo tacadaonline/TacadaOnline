@@ -334,6 +334,7 @@ canvas.addEventListener("touchstart", (e) => {
     touchStartX = touch.clientX - rect.left;
     touchStartY = touch.clientY - rect.top;
     isTouching = true;
+    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -401,7 +402,7 @@ canvas.addEventListener("touchend", (e) => {
     
     // Aplicar força na direção OPOSTA
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 10, 25);
+        const forceStrength = Math.min(dist / 5, 80);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
@@ -426,6 +427,7 @@ canvas.addEventListener("mousedown", (e) => {
     touchStartY = e.clientY - rect.top;
     isTouching = true;
     mousePressed = true;
+    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -479,7 +481,7 @@ document.addEventListener("mouseup", (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 10, 25);
+        const forceStrength = Math.min(dist / 5, 80);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
