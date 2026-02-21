@@ -81,9 +81,6 @@ let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
 let atrito = 0.995;
 let gameLoopRunning = false;
-let ultimaAtualizacaoAposta = 0;
-const BALANCE_SYNC_INTERVAL_MS = 5000;
-const BALANCE_UPDATE_COOLDOWN_MS = 2000;
 let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
@@ -337,7 +334,6 @@ canvas.addEventListener("touchstart", (e) => {
     touchStartX = touch.clientX - rect.left;
     touchStartY = touch.clientY - rect.top;
     isTouching = true;
-    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -405,7 +401,7 @@ canvas.addEventListener("touchend", (e) => {
     
     // Aplicar força na direção OPOSTA
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 5, 80);
+        const forceStrength = Math.min(dist / 10, 25);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
@@ -430,7 +426,6 @@ canvas.addEventListener("mousedown", (e) => {
     touchStartY = e.clientY - rect.top;
     isTouching = true;
     mousePressed = true;
-    timerAtivo = true;
     
     slingshot.style.display = "block";
 });
@@ -484,7 +479,7 @@ document.addEventListener("mouseup", (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 5, 80);
+        const forceStrength = Math.min(dist / 10, 25);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
@@ -499,17 +494,8 @@ document.addEventListener("mouseup", (e) => {
     isTouching = false;
 });
 
-/* ===== GAME LOOP =====*/
-function gameLoop() {
-    atualizarFisica();
-    if (gameLoopRunning) {
-        requestAnimationFrame(gameLoop);
-    }
-}
-
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
-    if (Date.now() - ultimaAtualizacaoAposta < BALANCE_UPDATE_COOLDOWN_MS) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
@@ -543,7 +529,6 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou; 
         document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
-        ultimaAtualizacaoAposta = Date.now();
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -640,7 +625,8 @@ function fecharModal() {
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
-    setInterval(atualizarSaldoDoServidor, BALANCE_SYNC_INTERVAL_MS);
+    atualizarSaldoDoServidor();
+    setInterval(atualizarSaldoDoServidor, 5000);
 };
 </script>
 </body>
