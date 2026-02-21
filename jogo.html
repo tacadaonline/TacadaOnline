@@ -494,27 +494,18 @@ document.addEventListener("mouseup", (e) => {
     isTouching = false;
 });
 
-// A função que busca o dado
+/* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
     try {
-        const res = await fetch(`/api/usuario/${usuarioLogado}`);
+        const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
         if(data.success) {
-            // Atualiza o texto que o jogador vê no HTML
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
-            // ATUALIZA A VARIÁVEL 'saldo' para as apostas funcionarem
-            saldo = data.saldo; 
         }
     } catch (e) {
         console.log("Erro ao buscar saldo:", e);
     }
 }
-
-// O "relógio" que executa a função acima repetidamente
-setInterval(atualizarSaldoDoServidor, 5000); 
-
-// Executa também assim que a página carregar para não esperar 5 segundos
-window.addEventListener('load', atualizarSaldoDoServidor);
 
 /* NOVO CONFIRMAR APOSTA (Substitua no HTML) */
 async function confirmBet() {
