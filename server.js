@@ -72,6 +72,12 @@ app.post("/api/aposta", async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo, ganhou });
 });
 
+app.get("/api/saldo", async (req, res) => {
+    const user = await User.findOne({ username: req.query.user?.trim().toLowerCase() });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, saldo: user.saldo });
+});
+
 // NOVO: ROTA PARA JOGADOR SOLICITAR SAQUE
 app.post("/api/solicitar-saque", async (req, res) => {
     const { username, valor, pix } = req.body;
