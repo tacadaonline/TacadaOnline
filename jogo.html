@@ -295,12 +295,35 @@ function atualizarFisica() {
         }
     }
 
-    // Verificar se bola dourada entrou na caçapa
+    // Verificar se bola dourada está perto da caçapa
     const dxHole = hole.x - dourada.x;
     const dyHole = hole.y - dourada.y;
     const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
-    if (distHole < hole.r) {
+    // FÍSICA GUIADA: Se o servidor disse "perdeu", desviar a bola da caçapa
+    if (!window.resultadoFinal && distHole < hole.r + dourada.r + 8) {
+        // Zona de desvio: quando a bola dourada chega perto da caçapa
+        // Calcular vetor de repulsão (empurrar pra fora da caçapa)
+        const repulsaoDist = Math.max(distHole, 1); // evitar divisão por zero
+        const repulsaoX = -dxHole / repulsaoDist; // vetor OPOSTO à caçapa
+        const repulsaoY = -dyHole / repulsaoDist;
+
+        // Força proporcional à proximidade (mais perto = mais forte)
+        const forcaDesvio = ((hole.r + dourada.r + 8) - distHole) * 0.35;
+
+        velocidadeDourada.x += repulsaoX * forcaDesvio;
+        velocidadeDourada.y += repulsaoY * forcaDesvio;
+
+        // Garantir que a bola não entre — se estiver dentro do raio, empurrar pra fora
+        if (distHole < hole.r) {
+            const pushDist = hole.r + dourada.r + 2;
+            dourada.x = hole.x - (dxHole / repulsaoDist) * pushDist;
+            dourada.y = hole.y - (dyHole / repulsaoDist) * pushDist;
+        }
+    }
+
+    // Bola dourada SÓ entra na caçapa se servidor confirmou vitória
+    if (distHole < hole.r && window.resultadoFinal) {
         finalizarJogo(true);
         return;
     }
@@ -646,8 +669,8 @@ function finalizarJogo(ganhouVisivel) {
             alert("⚠️ Erro ao creditar prêmio. Entre em contato com o suporte.");
         });
     } else if (ganhouVisivel && !window.resultadoFinal) {
-        // Anti-cheat: bola entrou mas servidor disse que perdeu
-        alert("⚠️ Lance inválido ou tempo expirado!");
+        // Fallback de segurança — não deveria acontecer com física guiada
+        alert("❌ Não foi dessa vez!");
     }
 
     // Cancelar qualquer refetch pendente
