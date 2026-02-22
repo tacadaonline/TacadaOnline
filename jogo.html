@@ -105,7 +105,7 @@ canvas.height = canvas.width * 0.80;
 
 let branca = { x: 0, y: 0, r: 8 }, 
     dourada = { x: 0, y: 0, r: 8 }, 
-    hole = { x: 0, y: 0, r: 10 };
+    hole = { x: 0, y: 0, r: 9 };
 
 /* ===== INICIALIZAR POSIÇÕES =====*/
 function sortearPosicoes() {
@@ -314,7 +314,7 @@ function atualizarFisica() {
                     velocidadeDourada.x * velocidadeDourada.x +
                     velocidadeDourada.y * velocidadeDourada.y
                 );
-                const intensidadeDesvio = velocidadeAtual * 0.18;
+                const intensidadeDesvio = velocidadeAtual * 0.08;
 
                 velocidadeDourada.x += perpX * direcao * intensidadeDesvio;
                 velocidadeDourada.y += perpY * direcao * intensidadeDesvio;
