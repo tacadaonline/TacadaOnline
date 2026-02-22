@@ -613,6 +613,17 @@ async function confirmBet() {
     const btnConfirm = document.getElementById("confirm");
     btnConfirm.disabled = true;
 
+    if (!usuarioLogado) {
+        alert("❌ Você precisa estar logado!");
+        btnConfirm.disabled = false;
+        return;
+    }
+    if (valorAposta < 1 || valorAposta > 10000 || isNaN(valorAposta)) {
+        alert("❌ Valor de aposta inválido!");
+        btnConfirm.disabled = false;
+        return;
+    }
+
     // Cancelar qualquer refetch pendente de jogos anteriores
     if (window._refetchTimer) {
         clearTimeout(window._refetchTimer);
@@ -762,28 +773,51 @@ async function gerarPix() {
     const valor = document.getElementById("vD").value;
     if(!valor || valor < 1) return alert("Valor inválido");
     document.getElementById("qR").innerHTML = "<p style='color:white'>Gerando...</p>";
-    const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
-    const data = await res.json();
-    if(data.success) {
-        document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
-        
-        // ✅ Polling a cada 5s por até 60s após gerar o PIX
-        let tentativas = 0;
-        const intervalo = setInterval(async () => {
-            await atualizarSaldoDoServidor();
-            tentativas++;
-            if (tentativas >= 12) clearInterval(intervalo); // para após 60s (12 * 5s)
-        }, 5000);
+    try {
+        const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
+            
+            // ✅ Polling a cada 5s por até 60s após gerar o PIX
+            let tentativas = 0;
+            const intervalo = setInterval(async () => {
+                await atualizarSaldoDoServidor();
+                tentativas++;
+                if (tentativas >= 12) clearInterval(intervalo); // para após 60s (12 * 5s)
+            }, 5000);
+        } else {
+            document.getElementById("qR").innerHTML = "<p style='color:#ff4444'>❌ Erro ao gerar QR Code. Tente novamente.</p>";
+        }
+    } catch(e) {
+        console.log("Erro ao gerar PIX:", e);
+        document.getElementById("qR").innerHTML = "<p style='color:#ff4444'>❌ Erro de conexão. Tente novamente.</p>";
     }
 }
 
-function fazerSaque() {
-    const valor = document.getElementById("vS").value;
+async function fazerSaque() {
+    const valor = parseFloat(document.getElementById("vS").value);
     const chave = document.getElementById("cP").value;
-    if(!valor || !chave) return alert("Preencha todos os campos");
-    alert("Saque solicitado com sucesso!");
-    fecharModal();
-    atualizarSaldoDoServidor();
+    if(!valor || valor < 1 || !chave) return alert("Preencha todos os campos corretamente");
+    
+    try {
+        const res = await fetch("/api/solicitar-saque", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username: usuarioLogado, valor: valor, pix: chave })
+        });
+        const data = await res.json();
+        if(data.success) {
+            alert("✅ Saque de R$ " + valor.toFixed(2) + " solicitado com sucesso!");
+            fecharModal();
+            atualizarSaldoDoServidor();
+        } else {
+            alert("❌ " + (data.message || "Erro ao solicitar saque. Saldo insuficiente?"));
+        }
+    } catch(e) {
+        console.log("Erro ao solicitar saque:", e);
+        alert("❌ Erro de conexão. Tente novamente.");
+    }
 }
 
 function fecharModal() { 
