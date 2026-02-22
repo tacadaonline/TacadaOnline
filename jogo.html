@@ -571,12 +571,22 @@ async function confirmBet() {
 function finalizarJogo(ganhouVisivel) {
     jogoAtivo = false;
     timerAtivo = false;
-    
-    // O veredito real vem do window.resultadoFinal que o servidor mandou no início
-    if (window.resultadoFinal) {
-        alert("🎉 VITÓRIA! Saldo atualizado.");
-    } else {
+
+    if (!ganhouVisivel) {
+        // Bola não entrou na caçapa
         alert("❌ Não foi dessa vez!");
+    } else if (ganhouVisivel && window.resultadoFinal) {
+        // ✅ Bola entrou E servidor confirmou vitória
+        const ganhoTotal = valorAposta * 3;
+        alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
+
+        // Refetch do saldo após 2 segundos para sincronizar com o servidor
+        setTimeout(() => {
+            atualizarSaldoDoServidor();
+        }, 2000);
+    } else if (ganhouVisivel && !window.resultadoFinal) {
+        // Anti-cheat: bola entrou mas servidor disse que perdeu
+        alert("⚠️ Lance inválido ou tempo expirado!");
     }
 
     apostando = false;
