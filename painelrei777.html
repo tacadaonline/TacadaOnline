@@ -164,7 +164,11 @@
                 document.getElementById("statUsers").innerText = cacheUsers.length;
                 
                 // Carregar RTP
-                const resR = await fetch("/admin/get-rtp");
+                const resR = await fetch("/admin/get-rtp", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ senha })
+                });
                 const dataR = await resR.json();
                 document.getElementById("statRtp").innerText = (dataR.rtp * 100).toFixed(0) + "%";
                 
