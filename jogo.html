@@ -500,7 +500,7 @@ document.addEventListener("mouseup", (e) => {
 });
 
 /* ===== ATUALIZAR SALDO =====*/
-async function atualizarSaldoDoServidor() {
+async function atualizarSaldoDoServidor(retries = 3) {
     try {
         // ✅ Validar se usuário está autenticado
         const user = usuarioLogado || localStorage.getItem("usuario");
@@ -515,9 +515,15 @@ async function atualizarSaldoDoServidor() {
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
         } else {
             console.log("❌ Erro ao buscar saldo:", data.error);
+            if (retries > 0) {
+                setTimeout(() => atualizarSaldoDoServidor(retries - 1), 1000);
+            }
         }
     } catch (e) {
         console.log("❌ Erro de conexão ao buscar saldo:", e);
+        if (retries > 0) {
+            setTimeout(() => atualizarSaldoDoServidor(retries - 1), 1000);
+        }
     }
 }
 
@@ -555,8 +561,8 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
 
-        // ✅ Refetch com delay para garantir que a sessão está pronta (300ms)
-        setTimeout(() => atualizarSaldoDoServidor(), 300);
+        // ✅ Refetch com delay para garantir que a sessão está pronta (1000ms)
+        setTimeout(() => atualizarSaldoDoServidor(), 1000);
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -644,8 +650,13 @@ async function gerarPix() {
     if(data.success) {
         document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
         
-        // ✅ Refetch automático após pagamento confirmado (2 segundos)
-        setTimeout(() => atualizarSaldoDoServidor(), 2000);
+        // ✅ Polling a cada 5s por até 60s após gerar o PIX
+        let tentativas = 0;
+        const intervalo = setInterval(async () => {
+            await atualizarSaldoDoServidor();
+            tentativas++;
+            if (tentativas >= 12) clearInterval(intervalo); // para após 60s (12 * 5s)
+        }, 5000);
     }
 }
 
@@ -665,6 +676,7 @@ function fecharModal() {
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
+    atualizarSaldoDoServidor();
 };
 </script>
 </body>
