@@ -58,17 +58,33 @@ app.post("/api/login", async (req, res) => {
 
 app.post("/api/aposta", async (req, res) => {
     const { username, valor } = req.body;
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
-    if (!user || user.saldo < valor) return res.status(400).json({ success: false });
 
-    const ganhou = Math.random() < globalRTP;
-    let mudanca = ganhou ? (valor * 2) : -valor;
-
-    if (!ganhou && user.indicadoPor) {
-        await User.findOneAndUpdate({ username: user.indicadoPor }, { $inc: { comissao: valor * 0.10 } });
+    if (!username || typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
+        return res.status(400).json({ success: false, message: "Dados inválidos" });
     }
 
-    const atualizado = await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: mudanca } }, { new: true });
+    const ganhou = Math.random() < globalRTP;
+    const mudanca = ganhou ? (valor * 2) : -valor;
+
+    // Operação ATÔMICA: só atualiza se saldo >= valor
+    const atualizado = await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
+        { $inc: { saldo: mudanca } },
+        { new: true }
+    );
+
+    if (!atualizado) {
+        return res.status(400).json({ success: false, message: "Saldo insuficiente" });
+    }
+
+    // Comissão de indicação (se perdeu)
+    if (!ganhou && atualizado.indicadoPor) {
+        await User.findOneAndUpdate(
+            { username: atualizado.indicadoPor },
+            { $inc: { comissao: valor * 0.10 } }
+        );
+    }
+
     res.json({ success: true, saldo: atualizado.saldo, ganhou });
 });
 
