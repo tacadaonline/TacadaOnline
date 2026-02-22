@@ -122,11 +122,38 @@ function sortearPosicoes() {
     const centroX = canvas.width / 2;
     const centroY = canvas.height / 2;
 
-    dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
-    dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+    if (window.resultadoFinal === false) {
+        // PERDEU: posicionar bolas com ângulo difícil
+        const offsetBase = 50 + Math.random() * 30; // 50-80px
+        const lado = Math.random() > 0.5 ? 1 : -1;
+        
+        dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
+        dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+        
+        // Deslocar lateralmente perpendicular à diagonal caçapa
+        // Para cantos: diagonal vai em x e y. Perpendicular: (+x, -y) ou (-x, +y)
+        dourada.x += offsetBase * lado;
+        dourada.y -= offsetBase * lado * 0.5;
+        
+        // Clamp dentro do canvas
+        dourada.x = Math.max(dourada.r + 10, Math.min(canvas.width - dourada.r - 10, dourada.x));
+        dourada.y = Math.max(dourada.r + 10, Math.min(canvas.height - dourada.r - 10, dourada.y));
+        
+        // Branca longe da caçapa
+        branca.x = dourada.x + (hole.x < centroX ? 80 : -80);
+        branca.y = dourada.y + (hole.y < centroY ? 80 : -80);
+    } else {
+        // GANHOU: posição alinhada (fácil)
+        dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
+        dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
 
-    branca.x = dourada.x + (hole.x < centroX ? 70 : -70);
-    branca.y = dourada.y + (hole.y < centroY ? 70 : -70);
+        branca.x = dourada.x + (hole.x < centroX ? 70 : -70);
+        branca.y = dourada.y + (hole.y < centroY ? 70 : -70);
+    }
+    
+    // Garantir ambas dentro dos limites
+    branca.x = Math.max(branca.r + 5, Math.min(canvas.width - branca.r - 5, branca.x));
+    branca.y = Math.max(branca.r + 5, Math.min(canvas.height - branca.r - 5, branca.y));
 
     velocidadeBranca = { x: 0, y: 0 };
     velocidadeDourada = { x: 0, y: 0 };
@@ -314,7 +341,7 @@ function atualizarFisica() {
                     velocidadeDourada.x * velocidadeDourada.x +
                     velocidadeDourada.y * velocidadeDourada.y
                 );
-                const intensidadeDesvio = velocidadeAtual * 0.03;
+                const intensidadeDesvio = velocidadeAtual * 0.06;
 
                 velocidadeDourada.x += perpX * direcao * intensidadeDesvio;
                 velocidadeDourada.y += perpY * direcao * intensidadeDesvio;
