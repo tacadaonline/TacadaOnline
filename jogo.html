@@ -81,7 +81,7 @@ let _ultimaApostaTimestamp = 0;
 let bolaMovida = false;
 let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
-let atrito = 0.999;
+let atrito = 1;
 let gameLoopRunning = false;
 
 let tempoJogo = 0;
@@ -463,7 +463,7 @@ canvas.addEventListener("touchend", (e) => {
     
     // Aplicar força na direção OPOSTA
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 10, 50);
+        const forceStrength = Math.min(dist / 10, 70);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
@@ -542,7 +542,7 @@ document.addEventListener("mouseup", (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist > 5) {
-        const forceStrength = Math.min(dist / 10, 50);
+        const forceStrength = Math.min(dist / 10, 70);
         const angle = Math.atan2(-dy, -dx);
         
         velocidadeBranca.x = Math.cos(angle) * forceStrength;
