@@ -502,13 +502,22 @@ document.addEventListener("mouseup", (e) => {
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
     try {
-        const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
+        // ✅ Validar se usuário está autenticado
+        const user = usuarioLogado || localStorage.getItem("usuario");
+        if (!user) {
+            console.log("❌ Usuário não autenticado");
+            return;
+        }
+
+        const res = await fetch(`/api/saldo?user=${user}`);
         const data = await res.json();
         if(data.success) {
             document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+        } else {
+            console.log("❌ Erro ao buscar saldo:", data.error);
         }
     } catch (e) {
-        console.log("Erro ao buscar saldo:", e);
+        console.log("❌ Erro de conexão ao buscar saldo:", e);
     }
 }
 
@@ -546,8 +555,8 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
 
-        // ✅ Refetch imediato para sincronizar saldo (evita oscilação)
-        atualizarSaldoDoServidor();
+        // ✅ Refetch com delay para garantir que a sessão está pronta (300ms)
+        setTimeout(() => atualizarSaldoDoServidor(), 300);
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -562,9 +571,7 @@ async function confirmBet() {
         
     } catch (e) {
         alert("❌ Erro de conexão");
-        if (!gameLoopRunning) {
-            btnConfirm.disabled = false;
-        }
+        btnConfirm.disabled = false;
         
         // ✅ Refetch se erro de conexão
         atualizarSaldoDoServidor();
