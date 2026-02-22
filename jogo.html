@@ -292,6 +292,33 @@ function atualizarFisica() {
             velocidadeBranca.y -= (v_dot * uy) * 0.9;
             velocidadeDourada.x += (v_dot * ux) * 0.9;
             velocidadeDourada.y += (v_dot * uy) * 0.9;
+
+            // FÍSICA GUIADA: desvio sutil na colisão quando servidor disse "perdeu"
+            if (window.resultadoFinal === false) {
+                // Vetor perpendicular ao eixo de colisão
+                const perpX = -uy;
+                const perpY = ux;
+
+                // Vetor da dourada até a caçapa
+                const toCacapaX = hole.x - dourada.x;
+                const toCacapaY = hole.y - dourada.y;
+
+                // Dot product para saber se perpendicular aponta pra caçapa ou pra longe
+                const dotPerp = perpX * toCacapaX + perpY * toCacapaY;
+
+                // Se dotPerp > 0, a perpendicular aponta pra caçapa, então inverter
+                const direcao = dotPerp > 0 ? -1 : 1;
+
+                // Aplicar desvio sutil — força pequena na perpendicular
+                const velocidadeAtual = Math.sqrt(
+                    velocidadeDourada.x * velocidadeDourada.x +
+                    velocidadeDourada.y * velocidadeDourada.y
+                );
+                const intensidadeDesvio = velocidadeAtual * 0.18;
+
+                velocidadeDourada.x += perpX * direcao * intensidadeDesvio;
+                velocidadeDourada.y += perpY * direcao * intensidadeDesvio;
+            }
         }
     }
 
@@ -300,31 +327,10 @@ function atualizarFisica() {
     const dyHole = hole.y - dourada.y;
     const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
-    // FÍSICA GUIADA: Se o servidor disse "perdeu", desviar a bola da caçapa (suave)
-    if (!window.resultadoFinal && distHole < hole.r + dourada.r + 5) {
-        // Zona de desvio: quando a bola dourada chega perto da caçapa
-        // Calcular vetor de repulsão (empurrar pra fora da caçapa)
-        const repulsaoDist = Math.max(distHole, 1); // evitar divisão por zero
-        const repulsaoX = -dxHole / repulsaoDist; // vetor OPOSTO à caçapa
-        const repulsaoY = -dyHole / repulsaoDist;
-
-        // Força SUAVE proporcional à proximidade (mais perto = mais forte)
-        const forcaDesvio = ((hole.r + dourada.r + 5) - distHole) * 0.12;
-
-        velocidadeDourada.x += repulsaoX * forcaDesvio;
-        velocidadeDourada.y += repulsaoY * forcaDesvio;
-
-        // Garantir que a bola não entre — se estiver dentro do raio, empurrar o mínimo
-        if (distHole < hole.r) {
-            const pushDist = hole.r + 1;
-            dourada.x = hole.x - (dxHole / repulsaoDist) * pushDist;
-            dourada.y = hole.y - (dyHole / repulsaoDist) * pushDist;
-        }
-    }
-
-    // Bola dourada SÓ entra na caçapa se servidor confirmou vitória
-    if (distHole < hole.r && window.resultadoFinal) {
-        finalizarJogo(true);
+    // Bola dourada entra na caçapa; resultado do servidor determina vitória ou derrota
+    if (distHole < hole.r) {
+        // Se servidor disse ganhou, vitória! Se não, é fallback (não deveria acontecer)
+        finalizarJogo(window.resultadoFinal ? true : false);
         return;
     }
 
