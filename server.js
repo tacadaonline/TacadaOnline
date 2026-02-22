@@ -6,11 +6,17 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const jwt = require("jsonwebtoken");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true
+}));
 app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(__dirname, ".")));
+app.use(express.static(path.join(__dirname, "public")));
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-mude-em-producao";
 
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
@@ -46,6 +52,25 @@ const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: t
 const registerLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
 const loginLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 const saldoLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+
+function autenticar(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, message: "Não autenticado" });
+    }
+    const token = authHeader.slice(7);
+    try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        if (!payload.username || typeof payload.username !== 'string') {
+            return res.status(401).json({ success: false, message: "Token inválido" });
+        }
+        req.usuario = payload.username.trim().toLowerCase();
+        next();
+    } catch (e) {
+        return res.status(401).json({ success: false, message: "Token inválido" });
+    }
+}
 
 app.post("/api/register", registerLimiter, async (req, res) => {
     try {
@@ -75,24 +100,28 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     }
     const user = await User.findOne({ username: username.trim().toLowerCase() });
     if (user && await bcrypt.compare(password, user.password)) {
-        return res.json({ success: true, username: user.username, saldo: user.saldo });
+        const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({ success: true, username: user.username, saldo: user.saldo, token });
     }
     res.status(400).json({ success: false });
 });
 
-app.post("/api/aposta", apostaLimiter, async (req, res) => {
-    const { username, valor } = req.body;
+app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
+    const username = req.usuario;
+    const { valor } = req.body;
 
-    if (!username || typeof username !== 'string' || typeof valor !== 'number' || isNaN(valor) || valor <= 0 || valor > 10000) {
+    if (typeof valor !== 'number' || isNaN(valor) || valor <= 0 || valor > 10000) {
         return res.status(400).json({ success: false, message: "Dados inválidos" });
     }
+
+    const valorArredondado = Math.round(valor * 100) / 100;
 
     const ganhou = Math.random() < globalRTP;
 
     // SEMPRE subtrai o valor da aposta (independente de ganhar ou perder)
     const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
-        { $inc: { saldo: -valor } },
+        { username: username.trim().toLowerCase(), saldo: { $gte: valorArredondado } },
+        { $inc: { saldo: -valorArredondado } },
         { new: true }
     );
 
@@ -104,7 +133,7 @@ app.post("/api/aposta", apostaLimiter, async (req, res) => {
     if (!ganhou && atualizado.indicadoPor) {
         await User.findOneAndUpdate(
             { username: atualizado.indicadoPor },
-            { $inc: { comissao: valor * 0.10 } }
+            { $inc: { comissao: valorArredondado * 0.10 } }
         );
     }
 
@@ -114,17 +143,18 @@ app.post("/api/aposta", apostaLimiter, async (req, res) => {
         premioToken = crypto.randomBytes(32).toString('hex');
         await User.findOneAndUpdate(
             { username: username.trim().toLowerCase() },
-            { $set: { premioToken: premioToken, premioValor: valor } }
+            { $set: { premioToken: premioToken, premioValor: valorArredondado } }
         );
     }
 
-    res.json({ success: true, saldo: atualizado.saldo, ganhou, premioToken });
+    res.json({ success: true, saldo: atualizado.saldo, premioToken });
 });
 
-app.post("/api/premio", premioLimiter, async (req, res) => {
-    const { username, premioToken } = req.body;
+app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
+    const username = req.usuario;
+    const { premioToken } = req.body;
 
-    if (!username || typeof username !== 'string' || !premioToken || typeof premioToken !== 'string') {
+    if (!premioToken || typeof premioToken !== 'string') {
         return res.status(400).json({ success: false, message: "Dados inválidos" });
     }
 
@@ -150,20 +180,18 @@ app.post("/api/premio", premioLimiter, async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo });
 });
 
-app.get("/api/saldo", saldoLimiter, async (req, res) => {
-    const user = await User.findOne({ username: req.query.user?.trim().toLowerCase() });
+app.get("/api/saldo", saldoLimiter, autenticar, async (req, res) => {
+    const user = await User.findOne({ username: req.usuario });
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, saldo: user.saldo });
 });
 
 // ROTA PARA JOGADOR SOLICITAR SAQUE
-app.post("/api/solicitar-saque", saqueLimiter, async (req, res) => {
-    const { username, valor, pix } = req.body;
+app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
+    const username = req.usuario;
+    const { valor, pix } = req.body;
 
     // Validações rigorosas
-    if (!username || typeof username !== 'string') {
-        return res.status(400).json({ success: false, message: "Username inválido" });
-    }
     if (!pix || typeof pix !== 'string' || pix.trim().length < 5) {
         return res.status(400).json({ success: false, message: "Chave PIX inválida" });
     }
@@ -214,7 +242,11 @@ app.post("/admin/saques-pendentes", async (req, res) => {
 
 app.post("/admin/set-rtp", (req, res) => {
     if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    globalRTP = parseFloat(req.body.rtp);
+    const rtp = parseFloat(req.body.rtp);
+    if (isNaN(rtp) || rtp < 0 || rtp > 1) {
+        return res.status(400).json({ success: false, message: "RTP inválido (deve ser entre 0 e 1)" });
+    }
+    globalRTP = rtp;
     res.json({ success: true });
 });
 
@@ -223,9 +255,18 @@ app.post("/admin/get-rtp", (req, res) => {
     res.json({ success: true, rtp: globalRTP });
 });
 
-app.post("/admin/add-saldo", async (req, res) => {
+app.post("/admin/add-saldo", adminLimiter, async (req, res) => {
     if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    await User.findOneAndUpdate({ username: req.body.username }, { $inc: { saldo: parseFloat(req.body.valor) } });
+    const { username, valor } = req.body;
+    if (!username || typeof username !== 'string') {
+        return res.status(400).json({ success: false, message: "Username inválido" });
+    }
+    const parsedValor = parseFloat(valor);
+    if (isNaN(parsedValor)) {
+        return res.status(400).json({ success: false, message: "Valor inválido" });
+    }
+    const user = await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: parsedValor } });
+    if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
     res.json({ success: true });
 });
 
