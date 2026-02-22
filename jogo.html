@@ -109,7 +109,7 @@ let branca = { x: 0, y: 0, r: 8 },
 
 /* ===== INICIALIZAR POSIÇÕES =====*/
 function sortearPosicoes() {
-    const m = 0; 
+    const m = -3; 
     const cantos = [
         {x: m, y: m}, 
         {x: canvas.width - m, y: m}, 
@@ -314,7 +314,7 @@ function atualizarFisica() {
                     velocidadeDourada.x * velocidadeDourada.x +
                     velocidadeDourada.y * velocidadeDourada.y
                 );
-                const intensidadeDesvio = velocidadeAtual * 0.08;
+                const intensidadeDesvio = velocidadeAtual * 0.03;
 
                 velocidadeDourada.x += perpX * direcao * intensidadeDesvio;
                 velocidadeDourada.y += perpY * direcao * intensidadeDesvio;
