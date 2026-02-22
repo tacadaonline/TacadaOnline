@@ -81,13 +81,12 @@ let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
 let atrito = 0.995;
 let gameLoopRunning = false;
-let lastBetTimestamp = 0;
+
 let tempoJogo = 0;
 let tempoMaximo = 2.5;
 let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 10; // canvas CSS border (px), used to sync SVG overlay coordinates
-const BALANCE_SYNC_COOLDOWN_MS = 15000; // ms to block interval sync after a bet response
 
 // Variáveis para o estilingue
 let touchStartX = 0;
@@ -502,10 +501,6 @@ document.addEventListener("mouseup", (e) => {
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
-    // ✅ NÃO atualizar enquanto o jogo está rodando ou durante aposta
-    if (jogoAtivo || apostando) return;
-    // Skip interval update if a bet response recently updated the balance (within 15 seconds)
-    if (Date.now() - lastBetTimestamp < BALANCE_SYNC_COOLDOWN_MS) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
         const data = await res.json();
@@ -542,12 +537,14 @@ async function confirmBet() {
         if (!data.success) {
             alert("❌ " + (data.message || "Erro na aposta"));
             btnConfirm.disabled = false;
+            
+            // ✅ Refetch se aposta falhar (saldo insuficiente, erro do servidor, etc)
+            atualizarSaldoDoServidor();
             return;
         }
 
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou; 
-        lastBetTimestamp = Date.now();
         document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
 
         sortearPosicoes();
@@ -566,6 +563,9 @@ async function confirmBet() {
         if (!gameLoopRunning) {
             btnConfirm.disabled = false;
         }
+        
+        // ✅ Refetch se erro de conexão
+        atualizarSaldoDoServidor();
     }
 }
 
@@ -581,15 +581,13 @@ function finalizarJogo(ganhouVisivel) {
         // ✅ Bola entrou E servidor confirmou vitória
         const ganhoTotal = valorAposta * 3;
         alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
-
-        // Refetch do saldo após 2 segundos para sincronizar com o servidor
-        setTimeout(() => {
-            atualizarSaldoDoServidor();
-        }, 2000);
     } else if (ganhouVisivel && !window.resultadoFinal) {
         // Anti-cheat: bola entrou mas servidor disse que perdeu
         alert("⚠️ Lance inválido ou tempo expirado!");
     }
+
+    // ✅ Refetch automático ao final do jogo (vitória, derrota ou inválido)
+    atualizarSaldoDoServidor();
 
     apostando = false;
     gameLoopRunning = false;
@@ -636,6 +634,9 @@ async function gerarPix() {
     const data = await res.json();
     if(data.success) {
         document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
+        
+        // ✅ Refetch automático após pagamento confirmado (2 segundos)
+        setTimeout(() => atualizarSaldoDoServidor(), 2000);
     }
 }
 
@@ -655,8 +656,6 @@ function fecharModal() {
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
-    atualizarSaldoDoServidor();
-    setInterval(atualizarSaldoDoServidor, 5000);
 };
 </script>
 </body>
