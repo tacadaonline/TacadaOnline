@@ -76,6 +76,8 @@ let valorAposta = 10;
 let dificuldadeRTP = 0.95;
 let jogoAtivo = false;
 let apostando = false;
+let _saldoServidor = 0;
+let _ultimaApostaTimestamp = 0;
 let bolaMovida = false;
 let velocidadeBranca = { x: 0, y: 0 };
 let velocidadeDourada = { x: 0, y: 0 };
@@ -500,6 +502,11 @@ document.addEventListener("mouseup", (e) => {
 });
 
 /* ===== ATUALIZAR SALDO =====*/
+function setSaldo(valor) {
+    _saldoServidor = parseFloat(valor) || 0;
+    document.getElementById("saldo").innerText = `R$ ${_saldoServidor.toFixed(2)}`;
+}
+
 let _fetchingSaldo = false;
 
 async function atualizarSaldoDoServidor(retries = 3) {
@@ -519,7 +526,7 @@ async function atualizarSaldoDoServidor(retries = 3) {
         const res = await fetch(`/api/saldo?user=${user}`);
         const data = await res.json();
         if(data.success) {
-            document.getElementById("saldo").innerText = `R$ ${parseFloat(data.saldo).toFixed(2)}`;
+            setSaldo(data.saldo);
         } else {
             console.log("❌ Erro ao buscar saldo:", data.error);
             if (retries > 0) {
@@ -550,6 +557,16 @@ async function confirmBet() {
     const btnConfirm = document.getElementById("confirm");
     btnConfirm.disabled = true;
 
+    // Cancelar qualquer refetch pendente de jogos anteriores
+    if (window._refetchTimer) {
+        clearTimeout(window._refetchTimer);
+        window._refetchTimer = null;
+    }
+    if (window._finalizarRefetchTimer) {
+        clearTimeout(window._finalizarRefetchTimer);
+        window._finalizarRefetchTimer = null;
+    }
+
     try {
         const res = await fetch("/api/aposta", {
             method: "POST",
@@ -571,13 +588,16 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
 
+        // Setar estado ANTES de qualquer outra coisa
+        apostando = true;
+        _ultimaApostaTimestamp = Date.now();
+
         // Usar o saldo retornado pelo servidor diretamente
-        const novoSaldo = parseFloat(data.saldo);
-        document.getElementById("saldo").innerText = `R$ ${(isNaN(novoSaldo) ? 0 : novoSaldo).toFixed(2)}`;
+        setSaldo(data.saldo);
 
         sortearPosicoes();
         jogoAtivo = true;
-        apostando = true;
+        // apostando já é true
         
         if (!gameLoopRunning) {
             gameLoopRunning = true;
@@ -624,7 +644,7 @@ function finalizarJogo(ganhouVisivel) {
     document.getElementById("confirm").disabled = false;
 
     // Refetch com delay suficiente para o banco propagar
-    setTimeout(() => atualizarSaldoDoServidor(), 1500);
+    window._finalizarRefetchTimer = setTimeout(() => atualizarSaldoDoServidor(), 1500);
     setTimeout(sortearPosicoes, 1000);
 }
 
