@@ -500,12 +500,17 @@ document.addEventListener("mouseup", (e) => {
 });
 
 /* ===== ATUALIZAR SALDO =====*/
+let _fetchingSaldo = false;
+
 async function atualizarSaldoDoServidor(retries = 3) {
+    if (_fetchingSaldo) return; // já está buscando, ignorar chamada duplicada
+    _fetchingSaldo = true;
     try {
         // ✅ Validar se usuário está autenticado
         const user = usuarioLogado || localStorage.getItem("usuario");
         if (!user) {
             console.log("❌ Usuário não autenticado");
+            _fetchingSaldo = false;
             return;
         }
 
@@ -516,15 +521,18 @@ async function atualizarSaldoDoServidor(retries = 3) {
         } else {
             console.log("❌ Erro ao buscar saldo:", data.error);
             if (retries > 0) {
-                setTimeout(() => atualizarSaldoDoServidor(retries - 1), 1000);
+                setTimeout(() => { _fetchingSaldo = false; atualizarSaldoDoServidor(retries - 1); }, 1000);
+                return;
             }
         }
     } catch (e) {
         console.log("❌ Erro de conexão ao buscar saldo:", e);
         if (retries > 0) {
-            setTimeout(() => atualizarSaldoDoServidor(retries - 1), 1000);
+            setTimeout(() => { _fetchingSaldo = false; atualizarSaldoDoServidor(retries - 1); }, 1000);
+            return;
         }
     }
+    _fetchingSaldo = false;
 }
 
 /* ===== GAME LOOP =====*/
@@ -561,8 +569,13 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
 
+        // Atualização otimista — mostrar saldo debitado imediatamente
+        const saldoEl = document.getElementById("saldo");
+        const saldoAtual = parseFloat(saldoEl.innerText.replace("R$ ", "").replace(",", ".")) || 0;
+        saldoEl.innerText = `R$ ${(saldoAtual - valorAposta).toFixed(2)}`;
+
         // ✅ Refetch com delay para garantir que a sessão está pronta (1000ms)
-        setTimeout(() => atualizarSaldoDoServidor(), 1000);
+        window._refetchTimer = setTimeout(() => atualizarSaldoDoServidor(), 1000);
 
         sortearPosicoes();
         jogoAtivo = true;
@@ -602,7 +615,11 @@ function finalizarJogo(ganhouVisivel) {
     }
 
     // ✅ Refetch automático ao final do jogo (vitória, derrota ou inválido)
-    atualizarSaldoDoServidor();
+    if (window._refetchTimer) {
+        clearTimeout(window._refetchTimer);
+        window._refetchTimer = null;
+    }
+    setTimeout(() => atualizarSaldoDoServidor(), 500);
 
     apostando = false;
     gameLoopRunning = false;
