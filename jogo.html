@@ -299,10 +299,10 @@ function atualizarFisica() {
         const ux = dx / dist;
         const uy = dy / dist;
         
-        branca.x -= (ux * overlap * 0.5);
-        branca.y -= (uy * overlap * 0.5);
-        dourada.x += (ux * overlap * 0.5);
-        dourada.y += (uy * overlap * 0.5);
+        branca.x -= (ux * overlap * 0.8);
+        branca.y -= (uy * overlap * 0.8);
+        dourada.x += (ux * overlap * 0.8);
+        dourada.y += (uy * overlap * 0.8);
         
         const vx1 = velocidadeBranca.x;
         const vy1 = velocidadeBranca.y;
