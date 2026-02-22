@@ -587,6 +587,7 @@ async function confirmBet() {
 
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
+        window.premioToken = data.premioToken || null;
 
         // Setar estado ANTES de qualquer outra coisa
         apostando = true;
@@ -624,9 +625,26 @@ function finalizarJogo(ganhouVisivel) {
         // Bola não entrou na caçapa
         alert("❌ Não foi dessa vez!");
     } else if (ganhouVisivel && window.resultadoFinal) {
-        // ✅ Bola entrou E servidor confirmou vitória
+        // ✅ Bola entrou E servidor confirmou vitória — PAGAR PRÊMIO
         const ganhoTotal = valorAposta * 3;
         alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
+
+        // Chamar endpoint de prêmio para creditar o ganho
+        fetch("/api/premio", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username: usuarioLogado, premioToken: window.premioToken })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                setSaldo(data.saldo);
+            }
+        })
+        .catch(e => {
+            console.log("Erro ao receber prêmio:", e);
+            alert("⚠️ Erro ao creditar prêmio. Entre em contato com o suporte.");
+        });
     } else if (ganhouVisivel && !window.resultadoFinal) {
         // Anti-cheat: bola entrou mas servidor disse que perdeu
         alert("⚠️ Lance inválido ou tempo expirado!");
