@@ -87,7 +87,7 @@ let tempoMaximo = 2.5;
 let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 10; // canvas CSS border (px), used to sync SVG overlay coordinates
-const BALANCE_SYNC_COOLDOWN_MS = 15000; // ms to block interval sync after a bet response
+const BALANCE_SYNC_COOLDOWN_MS = 20000; // ms to block interval sync after a bet response
 
 // Variáveis para o estilingue
 let touchStartX = 0;
@@ -573,6 +573,7 @@ async function confirmBet() {
 function finalizarJogo(ganhouVisivel) {
     jogoAtivo = false;
     timerAtivo = false;
+    lastBetTimestamp = 0; // allow explicit atualizarSaldoDoServidor() calls to proceed
 
     if (!ganhouVisivel) {
         // Bola não entrou na caçapa
@@ -656,7 +657,7 @@ window.onload = () => {
     sortearPosicoes(); 
     atualizarLucro();
     atualizarSaldoDoServidor();
-    setInterval(atualizarSaldoDoServidor, 5000);
+    setInterval(atualizarSaldoDoServidor, 20000);
 };
 </script>
 </body>
