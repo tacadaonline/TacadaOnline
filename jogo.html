@@ -637,14 +637,19 @@ function finalizarJogo(ganhouVisivel) {
         clearTimeout(window._refetchTimer);
         window._refetchTimer = null;
     }
+    if (window._finalizarRefetchTimer) {
+        clearTimeout(window._finalizarRefetchTimer);
+        window._finalizarRefetchTimer = null;
+    }
 
-    // Limpar estado ANTES de agendar refetch
+    // Limpar estado
     apostando = false;
     gameLoopRunning = false;
     document.getElementById("confirm").disabled = false;
 
-    // Refetch com delay suficiente para o banco propagar
-    window._finalizarRefetchTimer = setTimeout(() => atualizarSaldoDoServidor(), 1500);
+    // NÃO fazer refetch aqui — o saldo do servidor (setSaldo) já está correto
+    // desde o confirmBet(). Refetch só acontece em: onload, depósito PIX, saque, aposta falha.
+
     setTimeout(sortearPosicoes, 1000);
 }
 
