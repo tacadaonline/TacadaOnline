@@ -4,6 +4,8 @@ const cors = require("cors");
 const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 app.use(cors());
@@ -22,7 +24,9 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 },
     indicadoPor: { type: String, default: null },
-    comissao: { type: Number, default: 0 }
+    comissao: { type: Number, default: 0 },
+    premioToken: { type: String, default: null },
+    premioValor: { type: Number, default: null }
 });
 const User = mongoose.model("User", UserSchema);
 
@@ -36,6 +40,9 @@ const SaqueSchema = new mongoose.Schema({
 const Saque = mongoose.model("Saque", SaqueSchema);
 
 // --- ROTAS DE JOGO E USUÁRIO ---
+const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+
 app.post("/api/register", async (req, res) => {
     try {
         const { username, password, ref } = req.body;
@@ -56,7 +63,7 @@ app.post("/api/login", async (req, res) => {
     res.status(400).json({ success: false });
 });
 
-app.post("/api/aposta", async (req, res) => {
+app.post("/api/aposta", apostaLimiter, async (req, res) => {
     const { username, valor } = req.body;
 
     if (!username || typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
@@ -64,12 +71,11 @@ app.post("/api/aposta", async (req, res) => {
     }
 
     const ganhou = Math.random() < globalRTP;
-    const mudanca = ganhou ? (valor * 2) : -valor;
 
-    // Operação ATÔMICA: só atualiza se saldo >= valor
+    // SEMPRE subtrai o valor da aposta (independente de ganhar ou perder)
     const atualizado = await User.findOneAndUpdate(
         { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
-        { $inc: { saldo: mudanca } },
+        { $inc: { saldo: -valor } },
         { new: true }
     );
 
@@ -77,7 +83,7 @@ app.post("/api/aposta", async (req, res) => {
         return res.status(400).json({ success: false, message: "Saldo insuficiente" });
     }
 
-    // Comissão de indicação (se perdeu)
+    // Comissão de indicação (jogador apostou, casa fica com o valor se perder)
     if (!ganhou && atualizado.indicadoPor) {
         await User.findOneAndUpdate(
             { username: atualizado.indicadoPor },
@@ -85,7 +91,46 @@ app.post("/api/aposta", async (req, res) => {
         );
     }
 
-    res.json({ success: true, saldo: atualizado.saldo, ganhou });
+    // Se ganhou, gerar token de prêmio (uso único)
+    let premioToken = null;
+    if (ganhou) {
+        premioToken = crypto.randomBytes(32).toString('hex');
+        await User.findOneAndUpdate(
+            { username: username.trim().toLowerCase() },
+            { $set: { premioToken: premioToken, premioValor: valor } }
+        );
+    }
+
+    res.json({ success: true, saldo: atualizado.saldo, ganhou, premioToken });
+});
+
+app.post("/api/premio", premioLimiter, async (req, res) => {
+    const { username, premioToken } = req.body;
+
+    if (!username || !premioToken) {
+        return res.status(400).json({ success: false, message: "Dados inválidos" });
+    }
+
+    // Buscar e INVALIDAR o token atomicamente (só pode usar uma vez)
+    const user = await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
+        { $set: { premioToken: null } },
+        { new: false }
+    );
+
+    if (!user || !user.premioValor) {
+        return res.status(400).json({ success: false, message: "Token inválido ou já utilizado" });
+    }
+
+    const premio = user.premioValor * 3;
+
+    const atualizado = await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase() },
+        { $inc: { saldo: premio }, $set: { premioValor: null } },
+        { new: true }
+    );
+
+    res.json({ success: true, saldo: atualizado.saldo });
 });
 
 app.get("/api/saldo", async (req, res) => {
