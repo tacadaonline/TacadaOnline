@@ -87,7 +87,7 @@ let tempoMaximo = 2.5;
 let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 10; // canvas CSS border (px), used to sync SVG overlay coordinates
-const BALANCE_SYNC_COOLDOWN_MS = 10000; // ms to block interval sync after a bet response
+const BALANCE_SYNC_COOLDOWN_MS = 15000; // ms to block interval sync after a bet response
 
 // Variáveis para o estilingue
 let touchStartX = 0;
@@ -502,7 +502,9 @@ document.addEventListener("mouseup", (e) => {
 
 /* ===== ATUALIZAR SALDO =====*/
 async function atualizarSaldoDoServidor() {
-    // Skip interval update if a bet response recently updated the balance (within 10 seconds)
+    // ✅ NÃO atualizar enquanto o jogo está rodando ou durante aposta
+    if (jogoAtivo || apostando) return;
+    // Skip interval update if a bet response recently updated the balance (within 15 seconds)
     if (Date.now() - lastBetTimestamp < BALANCE_SYNC_COOLDOWN_MS) return;
     try {
         const res = await fetch(`/api/saldo?user=${usuarioLogado}`);
