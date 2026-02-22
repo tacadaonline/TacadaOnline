@@ -544,8 +544,10 @@ async function confirmBet() {
         }
 
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
-        window.resultadoFinal = data.ganhou; 
-        document.getElementById("saldo").innerText = `R$ ${data.saldo.toFixed(2)}`;
+        window.resultadoFinal = data.ganhou;
+
+        // ✅ Refetch imediato para sincronizar saldo (evita oscilação)
+        atualizarSaldoDoServidor();
 
         sortearPosicoes();
         jogoAtivo = true;
