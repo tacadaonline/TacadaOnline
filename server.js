@@ -20,7 +20,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-mude-em-producao";
 
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
-let globalRTP = 0.50; 
+let globalRTP = 0.30; 
 
 mongoose.connect(MONGO_URI).then(() => console.log("✅ BANCO CONECTADO")).catch(err => console.error("❌ ERRO BANCO:", err));
 
