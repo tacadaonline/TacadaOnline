@@ -8,6 +8,19 @@ const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
 const bspayService = require('./services/bspay.service');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+const axios = require('axios');
+
+async function checkIp() {
+  try {
+    const agent = new HttpsProxyAgent(process.env.FIXIE_URL);
+    const res = await axios.get('https://api.ipify.org', { httpsAgent: agent, proxy: false });
+    console.log(">>> MEU IP DE SAÍDA FIXIE É:", res.data.ip);
+  } catch (e) {
+    console.log("Erro ao checar IP:", e.message);
+  }
+}
+checkIp();
 
 const app = express();
 app.set('trust proxy', 1);
