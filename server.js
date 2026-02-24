@@ -10,6 +10,7 @@ const jwt = require("jsonwebtoken");
 const bspayService = require('./services/bspay.service');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true
