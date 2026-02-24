@@ -4,16 +4,15 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const bspayService = {
   gerarPix: async (dados) => {
     try {
-      const url = 'https://api.bspay.co'; // Verifique se precisa de /v1/pix etc
+      // AJUSTE 1: A URL correta para gerar PIX é /v2/pix/qrcode
+      const url = 'https://api.bspay.co'; 
       
-      // O Fixie fornece uma URL no formato: http://user:pass@host:port
-      // Ela deve estar configurada nas variáveis de ambiente do Render como FIXIE_URL
       const proxyUrl = process.env.FIXIE_URL;
       const agent = new HttpsProxyAgent(proxyUrl);
 
       const config = {
-        httpsAgent: agent, // O Agent faz o túnel pelo IP estático
-        proxy: false,      // Importante desativar o proxy nativo do Axios para usar o Agent
+        httpsAgent: agent, 
+        proxy: false,      
         headers: {
           'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
           'Content-Type': 'application/json',
@@ -21,14 +20,15 @@ const bspayService = {
         }
       };
 
+      // AJUSTE 2: A BSPAY exige 'payerName', 'payerTaxId' e 'amount'
       const body = {
-        name: dados.nome,
-        taxId: dados.cpf.replace(/\D/g, '') || "00000000000", 
-        value: parseFloat(dados.valor),
+        payerName: dados.nome, // Nome do cliente
+        payerTaxId: dados.cpf.replace(/\D/g, '') || "00000000000", // CPF limpo
+        amount: parseFloat(dados.valor), // A API usa 'amount', não 'value'
         postbackUrl: `https://tacadaonline-beckend.onrender.com`
       };
 
-      console.log(`[BSPAY] Enviando requisição via Proxy Fixie para IP Estático...`);
+      console.log(`[BSPAY] Enviando via Fixie (IP Estático) para: ${url}`);
 
       const response = await axios.post(url, body, config);
       return response.data;
@@ -38,8 +38,10 @@ const bspayService = {
       const erroData = error.response?.data;
 
       console.error(`[BSPAY ERROR] Status: ${erroStatus}`);
+      console.error("Detalhes da BSPAY:", erroData || error.message);
+
       if (erroStatus === 403) {
-        console.error("DICA: Verifique se o IP do Fixie foi liberado no painel da BSPAY.");
+        throw new Error("Erro 403: Verifique se os IPs do Fixie (52.5.155.132 / 52.87.82.133) foram liberados na BSPAY.");
       }
       
       throw new Error(erroData?.message || "Falha na comunicação com a API de pagamento.");
