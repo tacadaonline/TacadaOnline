@@ -215,17 +215,41 @@ app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo });
 });
 
-// Rota placeholder para depósito PIX (integrar com Suitpay/gateway real)
-app.post("/api/gerar-deposito", async (req, res) => {
-    const { username, valor } = req.body;
+// --- ROTAS DA BSPAY ---
 
-    if (!username || !valor || valor < 1) {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
+// 1. Rota para o Jogador pedir o PIX (QR Code)
+app.post("/api/pix/gerar", async (req, res) => {
+    try {
+        // Envia para o service os dados: { nome, cpf, valor }
+        const pixData = await bspayService.gerarPix(req.body);
+        res.json(pixData);
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 2. Webhook: A BSPAY avisa seu servidor que o dinheiro caiu
+app.post("/webhook/bspay", async (req, res) => {
+    const { status, value, name } = req.body;
+
+    // Se o status for pago (PAID ou COMPLETED)
+    if (status === 'PAID' || status === 'COMPLETED') {
+        const valorPago = parseFloat(value);
+        
+        // BUSCA O USUÁRIO PELO NOME (ou outro identificador que você enviar)
+        // Dica: No front, envie o nome do usuário no campo 'name' da BSPAY
+        const user = await User.findOneAndUpdate(
+            { username: name.trim().toLowerCase() }, 
+            { $inc: { saldo: valorPago } }
+        );
+
+        if (user) {
+            console.log(`[BSPAY] Saldo de R$${valorPago} adicionado para: ${name}`);
+        }
     }
 
-    // TODO: Integrar com API de pagamento real (Suitpay, Mercado Pago, etc)
-    // Por enquanto, retornar erro informativo
-    res.json({ success: false, message: "Integração PIX ainda não configurada. Configure na aba API do painel admin." });
+    // Retorna 200 para a BSPAY não reenviar o aviso
+    res.status(200).send("OK");
 });
 
 // --- ROTAS ADMIN ---
