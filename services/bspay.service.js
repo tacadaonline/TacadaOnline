@@ -4,10 +4,17 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const bspayService = {
   gerarPix: async (dados) => {
     try {
-      // AJUSTE 1: A URL correta para gerar PIX é /v2/pix/qrcode
+      // 1. URL COMPLETA (Crucial para evitar o 403)
       const url = 'https://api.bspay.co'; 
       
+      // 2. VALIDAÇÃO DA VARIÁVEL (Evita o erro 'undefined')
       const proxyUrl = process.env.FIXIE_URL;
+      
+      if (!proxyUrl) {
+        console.error("[BSPAY] ERRO: Variável FIXIE_URL não encontrada no Render!");
+        throw new Error("Configuração de Proxy (Fixie) ausente.");
+      }
+
       const agent = new HttpsProxyAgent(proxyUrl);
 
       const config = {
@@ -20,15 +27,14 @@ const bspayService = {
         }
       };
 
-      // AJUSTE 2: A BSPAY exige 'payerName', 'payerTaxId' e 'amount'
       const body = {
-        payerName: dados.nome, // Nome do cliente
-        payerTaxId: dados.cpf.replace(/\D/g, '') || "00000000000", // CPF limpo
-        amount: parseFloat(dados.valor), // A API usa 'amount', não 'value'
+        payerName: dados.nome,
+        payerTaxId: dados.cpf.replace(/\D/g, '') || "00000000000", 
+        amount: parseFloat(dados.valor),
         postbackUrl: `https://tacadaonline-beckend.onrender.com`
       };
 
-      console.log(`[BSPAY] Enviando via Fixie (IP Estático) para: ${url}`);
+      console.log(`[BSPAY] Iniciando tentativa via Fixie...`);
 
       const response = await axios.post(url, body, config);
       return response.data;
@@ -38,10 +44,11 @@ const bspayService = {
       const erroData = error.response?.data;
 
       console.error(`[BSPAY ERROR] Status: ${erroStatus}`);
-      console.error("Detalhes da BSPAY:", erroData || error.message);
+      console.error("Detalhes:", erroData || error.message);
 
       if (erroStatus === 403) {
-        throw new Error("Erro 403: Verifique se os IPs do Fixie (52.5.155.132 / 52.87.82.133) foram liberados na BSPAY.");
+        // Se chegar aqui, o IP do Fixie realmente não está na Whitelist da BSPAY
+        throw new Error("Erro 403: O IP do seu Fixie ainda não foi liberado no firewall da BSPAY.");
       }
       
       throw new Error(erroData?.message || "Falha na comunicação com a API de pagamento.");
