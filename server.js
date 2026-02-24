@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
+const bspayService = require('./services/bspay.service');
 
 const app = express();
 app.use(cors({
