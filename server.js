@@ -218,13 +218,26 @@ app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
 
 // --- ROTAS DA BSPAY ---
 
-// 1. Rota para o Jogador pedir o PIX (QR Code)
-app.post("/api/pix/gerar", async (req, res) => {
+// Rota para o seu jogo pedir o PIX (QR Code)
+app.post("/api/gerar-deposito", async (req, res) => {
     try {
-        // Envia para o service os dados: { nome, cpf, valor }
-        const pixData = await bspayService.gerarPix(req.body);
-        res.json(pixData);
+        const { username, valor } = req.body;
+
+        // Chamamos o serviço da BSPAY passando o username como 'nome'
+        const pixData = await bspayService.gerarPix({
+            nome: username, // Enviamos o username para o webhook identificar depois
+            cpf: "00000000000", // CPF genérico ou peça no front se a BSPAY exigir real
+            valor: parseFloat(valor)
+        });
+
+        // O front espera { success: true, qrCode: "..." }
+        // Verifique se a BSPAY retorna a imagem em 'qrcode' ou 'base64'
+        res.json({ 
+            success: true, 
+            qrCode: pixData.qrcode || pixData.base64 // Ajuste conforme o retorno da BSPAY
+        });
     } catch (error) {
+        console.error("Erro ao gerar PIX:", error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 });
