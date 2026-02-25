@@ -11,6 +11,7 @@ const jwt = require('jsonwebtoken');
 // --- IMPORTAÇÃO PARA O PROXY E API ---
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const QRCode = require('qrcode');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -162,17 +163,13 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
         const dados = response.data;
 
-        // Mapeamento inteligente - tenta vários nomes de campos possíveis
-        const qrcode = dados.qrcode || dados.qr_code || dados.qrCode || dados.qr_code_base64 || dados.qrcode_url || dados.image || dados.qr_code_url || null;
-        const pixCopiaECola = dados.pix_copy_paste || dados.pixCopiaECola || dados.pix_code || dados.emv || dados.brcode || dados.payload || dados.copy_paste || dados.qrcode_text || null;
-
-        console.log("🔍 QR Code encontrado?", !!qrcode, "->", typeof qrcode === 'string' ? qrcode.substring(0, 50) + "..." : qrcode);
-        console.log("🔍 Pix Copia e Cola encontrado?", !!pixCopiaECola, "->", typeof pixCopiaECola === 'string' ? pixCopiaECola.substring(0, 50) + "..." : pixCopiaECola);
+        const textoEMV = dados.qrcode;
+        const qrcodeImage = await QRCode.toDataURL(textoEMV, { width: 300, margin: 2 });
 
         res.json({ 
             success: true, 
-            qrcode: qrcode, 
-            pix_copy_paste: pixCopiaECola 
+            qrcode_image: qrcodeImage,
+            pix_copy_paste: textoEMV
         });
 
     } catch (error) {
