@@ -11,17 +11,39 @@ const bspayService = require('./services/bspay.service');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const axios = require('axios');
 
-async function checkIp() {
-  try {
-    const agent = new HttpsProxyAgent(process.env.FIXIE_URL);
-    const res = await axios.get('https://api.ipify.org', { httpsAgent: agent, proxy: false });
-    console.log(">>> MEU IP DE SAÍDA FIXIE É:", res.data.ip);
-  } catch (e) {
-    console.log("Erro ao checar IP:", e.message);
-  }
-}
-checkIp();
+const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
+async function debugProxy() {
+    const proxyUrl = process.env.FIXIE_URL;
+    
+    if (!proxyUrl) {
+        console.error("ERRO: A variável FIXIE_URL não foi encontrada!");
+        return;
+    }
+
+    console.log("Tentando conectar ao proxy...");
+
+    try {
+        const agent = new HttpsProxyAgent(proxyUrl);
+        const response = await axios.get('https://api.ipify.org', {
+            httpsAgent: agent,
+            proxy: false,
+            timeout: 10000 // 10 segundos
+        });
+
+        console.log("SUCESSO! Seu IP de saída é:", response.data.ip);
+        console.log("Cadastre esse IP na BSPAY!");
+    } catch (error) {
+        if (error.response) {
+            console.error("Erro na resposta:", error.response.status, error.response.data);
+        } else {
+            console.error("Erro de conexão:", error.message);
+        }
+    }
+}
+
+debugProxy();
 const app = express();
 app.set('trust proxy', 1);
 app.use(cors({
