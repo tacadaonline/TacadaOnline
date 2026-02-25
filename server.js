@@ -58,41 +58,36 @@ const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders:
 app.post("/api/gerar-pix", async (req, res) => {
     const { username, valor, cpf, email } = req.body;
 
-    if (!username || !valor || valor < 1) {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
-    }
-
     try {
-        // --- COLE O TESTE AQUI (DENTRO DO TRY) ---
+        // --- TESTE DE IP PARA VER NO LOG DO RENDER ---
         const testeIp = await axios.get('https://api.ipify.org', { 
             httpsAgent: agent, 
             proxy: false 
         });
-        console.log("CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip);
-        
-        // Payload baseado no seu exemplo PHP
+        console.log("CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip); 
+
         const payload = {
             amount: valor,
             external_id: crypto.randomBytes(12).toString('hex'),
             payerQuestion: "Deposito no Jogo",
             payer: {
                 name: username,
-                document: cpf || "00000000000", // BSPAY exige CPF válido (11 dígitos)
+                document: cpf || "00000000000",
                 email: email || `${username}@email.com`
             },
             postbackUrl: `https://${req.get('host')}/api/callback-pix`
         };
 
-       // Chamada via Axios usando o Túnel do Fixie (CORRIGIDO)
-const response = await axios.post('https://api.bspay.co', payload, {
-    httpsAgent: agent,
-    proxy: false,
-    headers: {
-        'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0'
-    }
-});
+        // --- CHAMADA CORRIGIDA COM A URL DA DOCUMENTAÇÃO ---
+        const response = await axios.post('https://api.bspay.co', payload, {
+            httpsAgent: agent,
+            proxy: false,
+            headers: {
+                'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
 
         res.json({ 
             success: true, 
@@ -101,16 +96,13 @@ const response = await axios.post('https://api.bspay.co', payload, {
         });
 
     } catch (error) {
-        console.error("[BSPAY ERROR] Status:", error.response?.status);
-        console.log("Detalhes do Erro:", error.response?.data);
-
-        if (error.response?.status === 403) {
-            return res.status(403).json({ 
-                success: false, 
-                message: "Acesso Negado (403). Libere os IPs do Fixie no painel da BSPAY." 
-            });
+        console.error("ERRO NO PROXY OU API:", error.message);
+        if (error.response) {
+            console.log("Status do Erro:", error.response.status);
+            // Aqui vai mostrar se o erro 403 é IP ou Token
+            console.log("Detalhes:", error.response.data); 
         }
-        res.status(500).json({ success: false, message: "Erro ao processar pagamento" });
+        res.status(500).json({ success: false, message: "Erro na comunicação com o gateway" });
     }
 });
 
