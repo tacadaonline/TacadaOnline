@@ -10,15 +10,54 @@ const jwt = require("jsonwebtoken");
 const bspayService = require('./services/bspay.service');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const axios = require('axios');
+
+async function checkIp() {
+  try {
+    const agent = new HttpsProxyAgent(process.env.FIXIE_URL);
+    const res = await axios.get('https://api.ipify.org', { httpsAgent: agent, proxy: false });
+    console.log(">>> MEU IP DE SAÍDA FIXIE É:", res.data.ip);
+  } catch (e) {
+    console.log("Erro ao checar IP:", e.message);
+  }
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
+async function debugProxy() {
+    const proxyUrl = process.env.FIXIE_URL;
+    
+    if (!proxyUrl) {
+        console.error("ERRO: A variável FIXIE_URL não foi encontrada!");
+        return;
+    }
 
+    console.log("Tentando conectar ao proxy...");
+
+    try {
+        const agent = new HttpsProxyAgent(proxyUrl);
+        const response = await axios.get('https://api.ipify.org', {
+            httpsAgent: agent,
+            proxy: false,
+            timeout: 10000 // 10 segundos
+        });
+
+        console.log("SUCESSO! Seu IP de saída é:", response.data.ip);
+        console.log("Cadastre esse IP na BSPAY!");
+    } catch (error) {
+        if (error.response) {
+            console.error("Erro na resposta:", error.response.status, error.response.data);
+        } else {
+            console.error("Erro de conexão:", error.message);
+        }
+    }
+}
+checkIp();
+
+debugProxy();
 const app = express();
 app.set('trust proxy', 1);
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true
+origin: process.env.CORS_ORIGIN || '*',
+credentials: true
 }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -33,22 +72,22 @@ mongoose.connect(MONGO_URI).then(() => console.log("✅ BANCO CONECTADO")).catch
 
 // --- SCHEMAS ---
 const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    saldo: { type: Number, default: 0 },
-    indicadoPor: { type: String, default: null },
-    comissao: { type: Number, default: 0 },
-    premioToken: { type: String, default: null },
-    premioValor: { type: Number, default: null }
+username: { type: String, required: true, unique: true },
+password: { type: String, required: true },
+saldo: { type: Number, default: 0 },
+indicadoPor: { type: String, default: null },
+comissao: { type: Number, default: 0 },
+premioToken: { type: String, default: null },
+premioValor: { type: Number, default: null }
 });
 const User = mongoose.model("User", UserSchema);
 
 const SaqueSchema = new mongoose.Schema({
-    username: String,
-    valor: Number,
-    chavePix: String,
-    status: { type: String, default: "pendente" },
-    data: { type: Date, default: Date.now }
+username: String,
+valor: Number,
+chavePix: String,
+status: { type: String, default: "pendente" },
+data: { type: Date, default: Date.now }
 });
 const Saque = mongoose.model("Saque", SaqueSchema);
 
@@ -62,256 +101,256 @@ const saldoLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: 
 const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
 
 function autenticar(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ success: false, message: "Não autenticado" });
-    }
-    const token = authHeader.slice(7);
-    try {
-        const payload = jwt.verify(token, JWT_SECRET);
-        if (!payload.username || typeof payload.username !== 'string') {
-            return res.status(401).json({ success: false, message: "Token inválido" });
-        }
-        req.usuario = payload.username.trim().toLowerCase();
-        next();
-    } catch (e) {
-        return res.status(401).json({ success: false, message: "Token inválido" });
-    }
+const authHeader = req.headers['authorization'];
+if (!authHeader || !authHeader.startsWith('Bearer ')) {
+return res.status(401).json({ success: false, message: "Não autenticado" });
+}
+const token = authHeader.slice(7);
+try {
+const payload = jwt.verify(token, JWT_SECRET);
+if (!payload.username || typeof payload.username !== 'string') {
+return res.status(401).json({ success: false, message: "Token inválido" });
+}
+req.usuario = payload.username.trim().toLowerCase();
+next();
+} catch (e) {
+return res.status(401).json({ success: false, message: "Token inválido" });
+}
 }
 
 app.post("/api/register", registerLimiter, async (req, res) => {
-    try {
-        const { username, password, ref } = req.body;
-        if (!username || typeof username !== 'string') {
-            return res.status(400).json({ success: false, message: "Username inválido" });
-        }
-        const cleanUsername = username.trim().toLowerCase();
-        if (cleanUsername.length < 3 || cleanUsername.length > 30 || !/^[a-z0-9_]+$/.test(cleanUsername)) {
-            return res.status(400).json({ success: false, message: "Username inválido (3-30 chars, letras/números/underscore)" });
-        }
-        if (!password || password.length < 4) {
-            return res.status(400).json({ success: false, message: "Senha deve ter pelo menos 4 caracteres" });
-        }
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-        const novo = new User({ username: cleanUsername, password: hashedPassword, indicadoPor: ref || null });
-        await novo.save();
-        res.json({ success: true });
-    } catch (err) { res.status(400).json({ success: false }); }
+try {
+const { username, password, ref } = req.body;
+if (!username || typeof username !== 'string') {
+return res.status(400).json({ success: false, message: "Username inválido" });
+}
+const cleanUsername = username.trim().toLowerCase();
+if (cleanUsername.length < 3 || cleanUsername.length > 30 || !/^[a-z0-9_]+$/.test(cleanUsername)) {
+return res.status(400).json({ success: false, message: "Username inválido (3-30 chars, letras/números/underscore)" });
+}
+if (!password || password.length < 4) {
+return res.status(400).json({ success: false, message: "Senha deve ter pelo menos 4 caracteres" });
+}
+const salt = await bcrypt.genSalt(10);
+const hashedPassword = await bcrypt.hash(password, salt);
+const novo = new User({ username: cleanUsername, password: hashedPassword, indicadoPor: ref || null });
+await novo.save();
+res.json({ success: true });
+} catch (err) { res.status(400).json({ success: false }); }
 });
 
 app.post("/api/login", loginLimiter, async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || typeof username !== 'string' || !password) {
-        return res.status(400).json({ success: false });
-    }
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
-    if (user && await bcrypt.compare(password, user.password)) {
-        const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-        return res.json({ success: true, username: user.username, saldo: user.saldo, token });
-    }
-    res.status(400).json({ success: false });
+const { username, password } = req.body;
+if (!username || typeof username !== 'string' || !password) {
+return res.status(400).json({ success: false });
+}
+const user = await User.findOne({ username: username.trim().toLowerCase() });
+if (user && await bcrypt.compare(password, user.password)) {
+const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+return res.json({ success: true, username: user.username, saldo: user.saldo, token });
+}
+res.status(400).json({ success: false });
 });
 
 app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
-    const username = req.usuario;
-    const { valor } = req.body;
+const username = req.usuario;
+const { valor } = req.body;
 
-    if (typeof valor !== 'number' || isNaN(valor) || valor <= 0 || valor > 10000) {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
-    }
+if (typeof valor !== 'number' || isNaN(valor) || valor <= 0 || valor > 10000) {
+return res.status(400).json({ success: false, message: "Dados inválidos" });
+}
 
-    const valorArredondado = Math.round(valor * 100) / 100;
+const valorArredondado = Math.round(valor * 100) / 100;
 
-    const ganhou = Math.random() < globalRTP;
+const ganhou = Math.random() < globalRTP;
 
-    // SEMPRE subtrai o valor da aposta (independente de ganhar ou perder)
-    const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), saldo: { $gte: valorArredondado } },
-        { $inc: { saldo: -valorArredondado } },
-        { new: true }
-    );
+// SEMPRE subtrai o valor da aposta (independente de ganhar ou perder)
+const atualizado = await User.findOneAndUpdate(
+{ username: username.trim().toLowerCase(), saldo: { $gte: valorArredondado } },
+{ $inc: { saldo: -valorArredondado } },
+{ new: true }
+);
 
-    if (!atualizado) {
-        return res.status(400).json({ success: false, message: "Saldo insuficiente" });
-    }
+if (!atualizado) {
+return res.status(400).json({ success: false, message: "Saldo insuficiente" });
+}
 
-    // Comissão de indicação (jogador apostou, casa fica com o valor se perder)
-    if (!ganhou && atualizado.indicadoPor) {
-        await User.findOneAndUpdate(
-            { username: atualizado.indicadoPor },
-            { $inc: { comissao: valorArredondado * 0.10 } }
-        );
-    }
+// Comissão de indicação (jogador apostou, casa fica com o valor se perder)
+if (!ganhou && atualizado.indicadoPor) {
+await User.findOneAndUpdate(
+{ username: atualizado.indicadoPor },
+{ $inc: { comissao: valorArredondado * 0.10 } }
+);
+}
 
-    // Se ganhou, gerar token de prêmio (uso único)
-    let premioToken = null;
-    if (ganhou) {
-        premioToken = crypto.randomBytes(32).toString('hex');
-        await User.findOneAndUpdate(
-            { username: username.trim().toLowerCase() },
-            { $set: { premioToken: premioToken, premioValor: valorArredondado } }
-        );
-    }
+// Se ganhou, gerar token de prêmio (uso único)
+let premioToken = null;
+if (ganhou) {
+premioToken = crypto.randomBytes(32).toString('hex');
+await User.findOneAndUpdate(
+{ username: username.trim().toLowerCase() },
+{ $set: { premioToken: premioToken, premioValor: valorArredondado } }
+);
+}
 
-    res.json({ success: true, saldo: atualizado.saldo, premioToken });
+res.json({ success: true, saldo: atualizado.saldo, premioToken });
 });
 
 app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
-    const username = req.usuario;
-    const { premioToken } = req.body;
+const username = req.usuario;
+const { premioToken } = req.body;
 
-    if (!premioToken || typeof premioToken !== 'string') {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
-    }
+if (!premioToken || typeof premioToken !== 'string') {
+return res.status(400).json({ success: false, message: "Dados inválidos" });
+}
 
-    // Buscar e INVALIDAR o token atomicamente (só pode usar uma vez)
-    const user = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
-        { $set: { premioToken: null } },
-        { new: false }
-    );
+// Buscar e INVALIDAR o token atomicamente (só pode usar uma vez)
+const user = await User.findOneAndUpdate(
+{ username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
+{ $set: { premioToken: null } },
+{ new: false }
+);
 
-    if (!user || !user.premioValor) {
-        return res.status(400).json({ success: false, message: "Token inválido ou já utilizado" });
-    }
+if (!user || !user.premioValor) {
+return res.status(400).json({ success: false, message: "Token inválido ou já utilizado" });
+}
 
-    const premio = user.premioValor * 3;
+const premio = user.premioValor * 3;
 
-    const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase() },
-        { $inc: { saldo: premio }, $set: { premioValor: null } },
-        { new: true }
-    );
+const atualizado = await User.findOneAndUpdate(
+{ username: username.trim().toLowerCase() },
+{ $inc: { saldo: premio }, $set: { premioValor: null } },
+{ new: true }
+);
 
-    res.json({ success: true, saldo: atualizado.saldo });
+res.json({ success: true, saldo: atualizado.saldo });
 });
 
 app.get("/api/saldo", saldoLimiter, autenticar, async (req, res) => {
-    const user = await User.findOne({ username: req.usuario });
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    res.json({ success: true, saldo: user.saldo });
+const user = await User.findOne({ username: req.usuario });
+if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+res.json({ success: true, saldo: user.saldo });
 });
 
 // ROTA PARA JOGADOR SOLICITAR SAQUE
 app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
-    const username = req.usuario;
-    const { valor, pix } = req.body;
+const username = req.usuario;
+const { valor, pix } = req.body;
 
-    // Validações rigorosas
-    if (!pix || typeof pix !== 'string' || pix.trim().length < 5) {
-        return res.status(400).json({ success: false, message: "Chave PIX inválida" });
-    }
-    if (typeof valor !== 'number' || isNaN(valor) || valor < 1 || valor > 10000) {
-        return res.status(400).json({ success: false, message: "Valor de saque inválido (mín R$1, máx R$10.000)" });
-    }
+// Validações rigorosas
+if (!pix || typeof pix !== 'string' || pix.trim().length < 5) {
+return res.status(400).json({ success: false, message: "Chave PIX inválida" });
+}
+if (typeof valor !== 'number' || isNaN(valor) || valor < 1 || valor > 10000) {
+return res.status(400).json({ success: false, message: "Valor de saque inválido (mín R$1, máx R$10.000)" });
+}
 
-    // Operação atômica — evita race condition (saque duplo)
-    const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
-        { $inc: { saldo: -valor } },
-        { new: true }
-    );
+// Operação atômica — evita race condition (saque duplo)
+const atualizado = await User.findOneAndUpdate(
+{ username: username.trim().toLowerCase(), saldo: { $gte: valor } },
+{ $inc: { saldo: -valor } },
+{ new: true }
+);
 
-    if (!atualizado) {
-        return res.status(400).json({ success: false, message: "Saldo insuficiente" });
-    }
+if (!atualizado) {
+return res.status(400).json({ success: false, message: "Saldo insuficiente" });
+}
 
-    await new Saque({ username: atualizado.username, valor, chavePix: pix.trim() }).save();
-    res.json({ success: true, saldo: atualizado.saldo });
+await new Saque({ username: atualizado.username, valor, chavePix: pix.trim() }).save();
+res.json({ success: true, saldo: atualizado.saldo });
 });
 
 // --- ROTAS DA BSPAY ---
 
 // Rota para o seu jogo pedir o PIX (QR Code)
 app.post("/api/gerar-deposito", async (req, res) => {
-    try {
-        const { username, valor } = req.body;
+try {
+const { username, valor } = req.body;
 
-        // Chamamos o serviço da BSPAY passando o username como 'nome'
-        const pixData = await bspayService.gerarPix({
-            nome: username, // Enviamos o username para o webhook identificar depois
-            cpf: "00000000000", // CPF genérico ou peça no front se a BSPAY exigir real
-            valor: parseFloat(valor)
-        });
+// Chamamos o serviço da BSPAY passando o username como 'nome'
+const pixData = await bspayService.gerarPix({
+nome: username, // Enviamos o username para o webhook identificar depois
+cpf: "00000000000", // CPF genérico ou peça no front se a BSPAY exigir real
+valor: parseFloat(valor)
+});
 
-        // O front espera { success: true, qrCode: "..." }
-        // Verifique se a BSPAY retorna a imagem em 'qrcode' ou 'base64'
-        res.json({ 
-            success: true, 
-            qrCode: pixData.qrcode || pixData.base64 // Ajuste conforme o retorno da BSPAY
-        });
-    } catch (error) {
-        console.error("Erro ao gerar PIX:", error.message);
-        res.status(500).json({ success: false, message: error.message });
-    }
+// O front espera { success: true, qrCode: "..." }
+// Verifique se a BSPAY retorna a imagem em 'qrcode' ou 'base64'
+res.json({ 
+success: true, 
+qrCode: pixData.qrcode || pixData.base64 // Ajuste conforme o retorno da BSPAY
+});
+} catch (error) {
+console.error("Erro ao gerar PIX:", error.message);
+res.status(500).json({ success: false, message: error.message });
+}
 });
 
 // 2. Webhook: A BSPAY avisa seu servidor que o dinheiro caiu
 app.post("/webhook/bspay", async (req, res) => {
-    const { status, value, name } = req.body;
+const { status, value, name } = req.body;
 
-    // Se o status for pago (PAID ou COMPLETED)
-    if (status === 'PAID' || status === 'COMPLETED') {
-        const valorPago = parseFloat(value);
-        
-        // BUSCA O USUÁRIO PELO NOME (ou outro identificador que você enviar)
-        // Dica: No front, envie o nome do usuário no campo 'name' da BSPAY
-        const user = await User.findOneAndUpdate(
-            { username: name.trim().toLowerCase() }, 
-            { $inc: { saldo: valorPago } }
-        );
+// Se o status for pago (PAID ou COMPLETED)
+if (status === 'PAID' || status === 'COMPLETED') {
+const valorPago = parseFloat(value);
 
-        if (user) {
-            console.log(`[BSPAY] Saldo de R$${valorPago} adicionado para: ${name}`);
-        }
-    }
+// BUSCA O USUÁRIO PELO NOME (ou outro identificador que você enviar)
+// Dica: No front, envie o nome do usuário no campo 'name' da BSPAY
+const user = await User.findOneAndUpdate(
+{ username: name.trim().toLowerCase() }, 
+{ $inc: { saldo: valorPago } }
+);
 
-    // Retorna 200 para a BSPAY não reenviar o aviso
-    res.status(200).send("OK");
+if (user) {
+console.log(`[BSPAY] Saldo de R$${valorPago} adicionado para: ${name}`);
+}
+}
+
+// Retorna 200 para a BSPAY não reenviar o aviso
+res.status(200).send("OK");
 });
 
 // --- ROTAS ADMIN ---
 app.post("/admin/usuarios", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
-    res.json({ success: true, usuarios: users });
+if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
+res.json({ success: true, usuarios: users });
 });
 
 app.post("/admin/saques-pendentes", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const saques = await Saque.find({ status: "pendente" });
-    res.json({ success: true, saques });
+if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+const saques = await Saque.find({ status: "pendente" });
+res.json({ success: true, saques });
 });
 
 app.post("/admin/set-rtp", (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const rtp = parseFloat(req.body.rtp);
-    if (isNaN(rtp) || rtp < 0 || rtp > 1) {
-        return res.status(400).json({ success: false, message: "RTP inválido (deve ser entre 0 e 1)" });
-    }
-    globalRTP = rtp;
-    res.json({ success: true });
+if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+const rtp = parseFloat(req.body.rtp);
+if (isNaN(rtp) || rtp < 0 || rtp > 1) {
+return res.status(400).json({ success: false, message: "RTP inválido (deve ser entre 0 e 1)" });
+}
+globalRTP = rtp;
+res.json({ success: true });
 });
 
 app.post("/admin/get-rtp", (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    res.json({ success: true, rtp: globalRTP });
+if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+res.json({ success: true, rtp: globalRTP });
 });
 
 app.post("/admin/add-saldo", adminLimiter, async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const { username, valor } = req.body;
-    if (!username || typeof username !== 'string') {
-        return res.status(400).json({ success: false, message: "Username inválido" });
-    }
-    const parsedValor = parseFloat(valor);
-    if (isNaN(parsedValor)) {
-        return res.status(400).json({ success: false, message: "Valor inválido" });
-    }
-    const user = await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: parsedValor } });
-    if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
-    res.json({ success: true });
+if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+const { username, valor } = req.body;
+if (!username || typeof username !== 'string') {
+return res.status(400).json({ success: false, message: "Username inválido" });
+}
+const parsedValor = parseFloat(valor);
+if (isNaN(parsedValor)) {
+return res.status(400).json({ success: false, message: "Valor inválido" });
+}
+const user = await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: parsedValor } });
+if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
+res.json({ success: true });
 });
 
 app.listen(process.env.PORT || 10000, '0.0.0.0');
