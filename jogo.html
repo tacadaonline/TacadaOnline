@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>TACADA ONLINE - OFICIAL</title>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1665967567715510');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1665967567715510&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; }
   body { background: #050505; color: gold; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
@@ -777,15 +794,18 @@ function copiarPix() {
     const texto = input.value;
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(texto).then(() => {
+            fbq('track', 'AddPaymentInfo', {value: parseFloat(document.getElementById("vD").value), currency: 'BRL'});
             alert("✅ Código PIX copiado!");
         }).catch(() => {
             input.select();
             document.execCommand('copy');
+            fbq('track', 'AddPaymentInfo', {value: parseFloat(document.getElementById("vD").value), currency: 'BRL'});
             alert("✅ Código PIX copiado!");
         });
     } else {
         input.select();
         document.execCommand('copy');
+        fbq('track', 'AddPaymentInfo', {value: parseFloat(document.getElementById("vD").value), currency: 'BRL'});
         alert("✅ Código PIX copiado!");
     }
 }
@@ -812,6 +832,7 @@ async function gerarPix() {
         const data = await res.json();
 
         if(data.success) {
+            fbq('track', 'InitiateCheckout', {value: valor, currency: 'BRL'});
             document.getElementById("qR").innerHTML = `
                 <img src="${data.qrcode_image}" width="180" style="border-radius:8px; background:white; padding:5px;"><br>
                 <p style="color:#aaa; font-size:9px; margin-top:5px;">Pix Copia e Cola:</p>
@@ -821,9 +842,15 @@ async function gerarPix() {
             `;
             
             // ✅ Polling a cada 5s por até 2 minutos após gerar o PIX
+            let saldoAnterior = parseFloat(document.getElementById("saldo").innerText.replace("R$ ", "").replace(",", ".")) || 0;
             let tentativas = 0;
             const intervalo = setInterval(async () => {
                 await atualizarSaldoDoServidor();
+                const saldoAtual = parseFloat(document.getElementById("saldo").innerText.replace("R$ ", "").replace(",", ".")) || 0;
+                if (saldoAtual > saldoAnterior) {
+                    fbq('track', 'Purchase', {value: valor, currency: 'BRL'});
+                    clearInterval(intervalo);
+                }
                 tentativas++;
                 if (tentativas >= 24) clearInterval(intervalo); // para após 120s
             }, 5000);
