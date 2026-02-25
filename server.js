@@ -20,6 +20,35 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // --- CONFIGURAÇÃO DO AGENTE FIXIE ---
 const proxyUrl = process.env.FIXIE_URL;
+
+// --- CACHE DO ACCESS TOKEN BSPAY (OAuth2) ---
+let bspayAccessToken = null;
+let bspayTokenExpira = 0;
+
+async function obterTokenBspay() {
+    if (bspayAccessToken && Date.now() < bspayTokenExpira) {
+        return bspayAccessToken;
+    }
+
+    console.log("🔑 Gerando novo access_token na BSPAY...");
+
+    const response = await axios.post('https://api.bspay.co/v2/oauth/token', {
+        client_id: process.env.BSPAY_CLIENT_ID,
+        client_secret: process.env.BSPAY_CLIENT_SECRET,
+        grant_type: 'client_credentials'
+    }, {
+        httpsAgent: agent,
+        proxy: false,
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+    });
+
+    bspayAccessToken = response.data.access_token;
+    bspayTokenExpira = Date.now() + ((response.data.expires_in - 300) * 1000);
+
+    console.log("✅ Access token BSPAY obtido com sucesso!");
+    return bspayAccessToken;
+}
 // Agente configurado com timeout para evitar o erro 'undefined'
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl, { keepAlive: true, timeout: 10000 }) : null;
 
@@ -93,9 +122,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
     const username = req.usuario.username;
 
     try {
-        const bspayToken = process.env.BSPAY_TOKEN;
-        console.log("🔑 BSPAY_TOKEN existe?", !!bspayToken);
-        console.log("🔑 BSPAY_TOKEN primeiros 10 chars:", bspayToken ? bspayToken.substring(0, 10) + "..." : "VAZIO!");
+        const accessToken = await obterTokenBspay();
         const payload = {
             amount: parseFloat(valor),
             external_id: crypto.randomBytes(12).toString('hex'),
@@ -113,7 +140,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
             httpsAgent: agent,
             proxy: false,
             headers: {
-                'Authorization': `Bearer ${bspayToken}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'Mozilla/5.0'
             }
@@ -129,7 +156,11 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
         console.error("❌ ERRO NA API BSPAY:", error.message);
         if (error.response) {
             console.log("Status do Erro:", error.response.status);
-            console.log("Detalhes:", JSON.stringify(error.response.data)); 
+            console.log("Detalhes:", JSON.stringify(error.response.data));
+        }
+        if (error.response?.status === 401) {
+            bspayAccessToken = null;
+            bspayTokenExpira = 0;
         }
         res.status(500).json({ success: false, message: "Erro ao gerar PIX. Verifique os logs." });
     }

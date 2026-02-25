@@ -2,12 +2,37 @@ const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const crypto = require('crypto');
 
+let bspayAccessToken = null;
+let bspayTokenExpira = 0;
+
+async function obterTokenBspay(agent) {
+    if (bspayAccessToken && Date.now() < bspayTokenExpira) {
+        return bspayAccessToken;
+    }
+
+    console.log("[BSPAY] 🔑 Gerando novo access_token...");
+
+    const response = await axios.post('https://api.bspay.co/v2/oauth/token', {
+        client_id: process.env.BSPAY_CLIENT_ID,
+        client_secret: process.env.BSPAY_CLIENT_SECRET,
+        grant_type: 'client_credentials'
+    }, {
+        httpsAgent: agent,
+        proxy: false,
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+    });
+
+    bspayAccessToken = response.data.access_token;
+    bspayTokenExpira = Date.now() + ((response.data.expires_in - 300) * 1000);
+
+    console.log("[BSPAY] ✅ Access token obtido com sucesso!");
+    return bspayAccessToken;
+}
+
 const bspayService = {
   gerarPix: async (dados) => {
     try {
-      // URL CORRETA DA DOCUMENTAÇÃO
-      const url = 'https://api.bspay.co'; 
-      
       const proxyUrl = process.env.FIXIE_URL;
       
       if (!proxyUrl) {
@@ -15,10 +40,10 @@ const bspayService = {
         throw new Error("Configuração de Proxy ausente.");
       }
 
-      // Criando o agente (Certifique-se que a URL no Render termina em :80)
       const agent = new HttpsProxyAgent(proxyUrl);
 
-      // Payload ajustado conforme o seu exemplo PHP
+      const accessToken = await obterTokenBspay(agent);
+
       const body = {
         amount: parseFloat(dados.valor),
         external_id: crypto.randomBytes(8).toString('hex'), 
@@ -33,11 +58,11 @@ const bspayService = {
 
       console.log(`[BSPAY] Tentando gerar PIX via Fixie...`);
 
-      const response = await axios.post(url, body, {
+      const response = await axios.post('https://api.bspay.co/v2/pix/qrcode', body, {
         httpsAgent: agent, 
         proxy: false,      
         headers: {
-          'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0' 
         },
@@ -52,6 +77,11 @@ const bspayService = {
 
       console.error(`[BSPAY ERROR] Status: ${erroStatus}`);
       console.error("Detalhes:", JSON.stringify(erroData) || error.message);
+
+      if (erroStatus === 401) {
+        bspayAccessToken = null;
+        bspayTokenExpira = 0;
+      }
 
       if (erroStatus === 403) {
         throw new Error("IP Bloqueado pela BSPAY. Verifique os IPs do Fixie no painel deles.");
