@@ -12,16 +12,24 @@ async function obterTokenBspay(agent) {
 
     console.log("[BSPAY] 🔑 Gerando novo access_token...");
 
-    const response = await axios.post('https://api.bspay.co/v2/oauth/token', {
-        client_id: process.env.BSPAY_CLIENT_ID,
-        client_secret: process.env.BSPAY_CLIENT_SECRET,
-        grant_type: 'client_credentials'
-    }, {
-        httpsAgent: agent,
-        proxy: false,
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000
-    });
+    // Basic Auth com Base64 (conforme documentação BSPAY)
+    const clientId = process.env.BSPAY_CLIENT_ID;
+    const clientSecret = process.env.BSPAY_CLIENT_SECRET;
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const response = await axios.post('https://api.bspay.co/v2/oauth/token', 
+        'grant_type=client_credentials',
+        {
+            httpsAgent: agent,
+            proxy: false,
+            headers: { 
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
+            timeout: 10000
+        }
+    );
 
     bspayAccessToken = response.data.access_token;
     bspayTokenExpira = Date.now() + ((response.data.expires_in - 300) * 1000);
