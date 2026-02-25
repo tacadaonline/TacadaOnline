@@ -13,6 +13,7 @@ const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -92,6 +93,9 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
     const username = req.usuario.username;
 
     try {
+        const bspayToken = process.env.BSPAY_TOKEN;
+        console.log("🔑 BSPAY_TOKEN existe?", !!bspayToken);
+        console.log("🔑 BSPAY_TOKEN primeiros 10 chars:", bspayToken ? bspayToken.substring(0, 10) + "..." : "VAZIO!");
         const payload = {
             amount: parseFloat(valor),
             external_id: crypto.randomBytes(12).toString('hex'),
@@ -109,7 +113,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
             httpsAgent: agent,
             proxy: false,
             headers: {
-                'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
+                'Authorization': `Bearer ${bspayToken}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'Mozilla/5.0'
             }
@@ -125,7 +129,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
         console.error("❌ ERRO NA API BSPAY:", error.message);
         if (error.response) {
             console.log("Status do Erro:", error.response.status);
-            console.log("Detalhes do Servidor:", error.response.data); 
+            console.log("Detalhes:", JSON.stringify(error.response.data)); 
         }
         res.status(500).json({ success: false, message: "Erro ao gerar PIX. Verifique os logs." });
     }
