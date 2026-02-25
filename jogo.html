@@ -572,14 +572,16 @@ async function atualizarSaldoDoServidor(retries = 3) {
     _fetchingSaldo = true;
     try {
         // ✅ Validar se usuário está autenticado
-        const user = usuarioLogado || localStorage.getItem("usuario");
-        if (!user) {
+        const token = localStorage.getItem("token");
+        if (!token) {
             console.log("❌ Usuário não autenticado");
             _fetchingSaldo = false;
             return;
         }
 
-        const res = await fetch(`/api/saldo?user=${user}`);
+        const res = await fetch(`/api/saldo`, {
+            headers: {"Authorization": "Bearer " + token}
+        });
         const data = await res.json();
         if(data.success) {
             setSaldo(data.saldo);
@@ -635,10 +637,11 @@ async function confirmBet() {
     }
 
     try {
+        const token = localStorage.getItem("token");
         const res = await fetch("/api/aposta", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username: usuarioLogado, valor: valorAposta })
+            headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+            body: JSON.stringify({ valor: valorAposta })
         });
 
         const data = await res.json();
@@ -779,14 +782,12 @@ async function gerarPix() {
     
     try {
         // Chamada para a rota correta que criamos no server.js
+        const token = localStorage.getItem("token");
         const res = await fetch("/api/gerar-pix", { 
             method: "POST", 
-            headers: {"Content-Type": "application/json"}, 
+            headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token}, 
             body: JSON.stringify({
-                username: usuarioLogado, 
-                valor: valor,
-                cpf: "00000000000", // Opcional: Adicione um campo no HTML para o usuário digitar o CPF
-                email: usuarioLogado + "@email.com"
+                valor: valor
             })
         });
 
@@ -826,10 +827,11 @@ async function fazerSaque() {
     if(!valor || valor < 1 || !chave) return alert("Preencha todos os campos corretamente");
     
     try {
+        const token = localStorage.getItem("token");
         const res = await fetch("/api/solicitar-saque", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username: usuarioLogado, valor: valor, pix: chave })
+            headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+            body: JSON.stringify({ valor: valor, pix: chave })
         });
         const data = await res.json();
         if(data.success) {

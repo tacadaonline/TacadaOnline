@@ -6,15 +6,16 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const jwt = require('jsonwebtoken');
 
 // --- IMPORTAÇÃO PARA O PROXY E API ---
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, ".")));
+app.use(express.static(path.join(__dirname, "public")));
 
 // --- CONFIGURAÇÃO DO AGENTE FIXIE ---
 const proxyUrl = process.env.FIXIE_URL;
@@ -27,9 +28,14 @@ if (proxyUrl) {
     console.error("❌ AVISO: FIXIE_URL não encontrada nas variáveis de ambiente.");
 }
 
-const MONGO_URI = process.env.MONGO_URI; 
-const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
-let globalRTP = 0.30; 
+const MONGO_URI = process.env.MONGO_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS;
+if (!ADMIN_PASSWORD_FIXA) {
+    console.error("❌ ERRO CRÍTICO: ADMIN_PASS não configurada nas variáveis de ambiente.");
+    process.exit(1);
+}
+let globalRTP = 0.30;
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ BANCO CONECTADO"))
@@ -59,24 +65,33 @@ const Saque = mongoose.model("Saque", SaqueSchema);
 // --- LIMITADORES ---
 const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+const pixLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+
+// --- SANITIZAR ---
+function sanitizar(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// --- MIDDLEWARE: AUTENTICAR JWT ---
+function autenticar(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false, message: 'Token não fornecido' });
+    try {
+        req.usuario = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (e) {
+        return res.status(403).json({ success: false, message: 'Token inválido' });
+    }
+}
 
 // --- ROTA: GERAR PIX (BSPAY COM PROXY) ---
-app.post("/api/gerar-pix", async (req, res) => {
-    const { username, valor, cpf, email } = req.body;
+app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
+    const { valor, cpf, email } = req.body;
+    const username = req.usuario.username;
 
     try {
-        // --- TESTE DE IP CORRIGIDO (PARA VER NO LOG DO RENDER) ---
-        try {
-            const testeIp = await axios.get('https://api.ipify.org', { 
-                httpsAgent: agent, 
-                proxy: false,
-                timeout: 5000 
-            });
-            console.log("📡 CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip); 
-        } catch (e) {
-            console.error("⚠️ Falha ao verificar IP do Proxy:", e.message);
-        }
-
         const payload = {
             amount: parseFloat(valor),
             external_id: crypto.randomBytes(12).toString('hex'),
@@ -90,7 +105,7 @@ app.post("/api/gerar-pix", async (req, res) => {
         };
 
         // --- CHAMADA COM URL COMPLETA E HEADERS ---
-        const response = await axios.post('https://api.bspay.co', payload, {
+        const response = await axios.post('https://api.bspay.co/v2/pix/qrcode', payload, {
             httpsAgent: agent,
             proxy: false,
             headers: {
@@ -118,6 +133,11 @@ app.post("/api/gerar-pix", async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
+app.post("/api/callback-pix", (req, res) => {
+    console.log("📩 Callback PIX recebido:", req.body);
+    res.json({ received: true });
+});
+
 app.post("/api/register", async (req, res) => {
     try {
         const { username, password, ref } = req.body;
@@ -133,13 +153,15 @@ app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username: username.trim().toLowerCase() });
     if (user && await bcrypt.compare(password, user.password)) {
-        return res.json({ success: true, username: user.username, saldo: user.saldo });
+        const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+        return res.json({ success: true, username: user.username, saldo: user.saldo, token });
     }
     res.status(400).json({ success: false });
 });
 
-app.post("/api/aposta", apostaLimiter, async (req, res) => {
-    const { username, valor } = req.body;
+app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
+    const { valor } = req.body;
+    const username = req.usuario.username;
     if (!username || typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
         return res.status(400).json({ success: false, message: "Dados inválidos" });
     }
@@ -174,14 +196,15 @@ app.post("/api/premio", premioLimiter, async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo });
 });
 
-app.get("/api/saldo", async (req, res) => {
-    const user = await User.findOne({ username: req.query.user?.trim().toLowerCase() });
+app.get("/api/saldo", autenticar, async (req, res) => {
+    const user = await User.findOne({ username: req.usuario.username });
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, saldo: user.saldo });
 });
 
-app.post("/api/solicitar-saque", async (req, res) => {
-    const { username, valor, pix } = req.body;
+app.post("/api/solicitar-saque", autenticar, async (req, res) => {
+    const { valor, pix } = req.body;
+    const username = req.usuario.username;
     const user = await User.findOne({ username: username.trim().toLowerCase() });
     if (!user || user.saldo < valor) return res.status(400).json({ success: false });
     await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: -valor } });

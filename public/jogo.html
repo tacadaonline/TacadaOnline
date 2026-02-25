@@ -722,7 +722,8 @@ async function gerarPix() {
     if(!valor || valor < 1) return alert("Valor inválido");
     document.getElementById("qR").innerHTML = "<p style='color:white'>Gerando...</p>";
     try {
-        const res = await fetch("/api/gerar-deposito", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: usuarioLogado, valor})});
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/gerar-pix", { method: "POST", headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token}, body: JSON.stringify({valor})});
         const data = await res.json();
         if(data.success) {
             document.getElementById("qR").innerHTML = `<img src="data:image/png;base64,${data.qrCode}" width="180"><br><button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Atualizar Saldo</button>`;
