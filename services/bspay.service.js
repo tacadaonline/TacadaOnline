@@ -5,7 +5,7 @@ const bspayService = {
   gerarPix: async (dados) => {
     try {
       // CORREÇÃO: A URL precisa do path completo para não dar 403
-      const url = 'https://api.bspay.co'; 
+      const url = 'https://api.bspay.co/v2/pix/qrcode'; 
       
       const proxyUrl = process.env.FIXIE_URL;
       
