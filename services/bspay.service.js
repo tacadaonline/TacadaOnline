@@ -4,10 +4,9 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const bspayService = {
   gerarPix: async (dados) => {
     try {
-      // 1. URL COMPLETA (Crucial para evitar o 403)
+      // CORREÇÃO: A URL precisa do path completo para não dar 403
       const url = 'https://api.bspay.co'; 
       
-      // 2. VALIDAÇÃO DA VARIÁVEL (Evita o erro 'undefined')
       const proxyUrl = process.env.FIXIE_URL;
       
       if (!proxyUrl) {
@@ -23,7 +22,7 @@ const bspayService = {
         headers: {
           'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
           'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Bspay-Integration-NodeJS/1.0' 
         }
       };
 
@@ -34,7 +33,7 @@ const bspayService = {
         postbackUrl: `https://tacadaonline-beckend.onrender.com`
       };
 
-      console.log(`[BSPAY] Iniciando tentativa via Fixie...`);
+      console.log(`[BSPAY] Enviando requisição via Fixie para: ${url}`);
 
       const response = await axios.post(url, body, config);
       return response.data;
@@ -47,11 +46,10 @@ const bspayService = {
       console.error("Detalhes:", erroData || error.message);
 
       if (erroStatus === 403) {
-        // Se chegar aqui, o IP do Fixie realmente não está na Whitelist da BSPAY
-        throw new Error("Erro 403: O IP do seu Fixie ainda não foi liberado no firewall da BSPAY.");
+        throw new Error("Erro 403: Verifique se os IPs do Fixie foram liberados no painel da BSPAY.");
       }
       
-      throw new Error(erroData?.message || "Falha na comunicação com a API de pagamento.");
+      throw new Error(erroData?.message || "Falha na comunicação com a API.");
     }
   }
 };
