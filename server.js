@@ -63,6 +63,13 @@ app.post("/api/gerar-pix", async (req, res) => {
     }
 
     try {
+        // --- COLE O TESTE AQUI (DENTRO DO TRY) ---
+        const testeIp = await axios.get('https://api.ipify.org', { 
+            httpsAgent: agent, 
+            proxy: false 
+        });
+        console.log("CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip);
+        
         // Payload baseado no seu exemplo PHP
         const payload = {
             amount: valor,
