@@ -7,10 +7,19 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 
+// --- MODIFICAÇÃO 1: IMPORTAR AXIOS E O PROXY AGENT ---
+const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
+
+// --- MODIFICAÇÃO 2: CONFIGURAR O AGENTE DO FIXIE ---
+// Certifique-se de adicionar a variável FIXIE_URL no painel do Render
+const proxyUrl = process.env.FIXIE_URL;
+const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : null;
 
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
@@ -18,163 +27,52 @@ let globalRTP = 0.30;
 
 mongoose.connect(MONGO_URI).then(() => console.log("✅ BANCO CONECTADO")).catch(err => console.error("❌ ERRO BANCO:", err));
 
-// --- SCHEMAS ---
-const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    saldo: { type: Number, default: 0 },
-    indicadoPor: { type: String, default: null },
-    comissao: { type: Number, default: 0 },
-    premioToken: { type: String, default: null },
-    premioValor: { type: Number, default: null }
-});
-const User = mongoose.model("User", UserSchema);
+// ... (Seus SCHEMAS User e Saque continuam iguais aqui) ...
 
-const SaqueSchema = new mongoose.Schema({
-    username: String,
-    valor: Number,
-    chavePix: String,
-    status: { type: String, default: "pendente" },
-    data: { type: Date, default: Date.now }
-});
-const Saque = mongoose.model("Saque", SaqueSchema);
-
-// --- ROTAS DE JOGO E USUÁRIO ---
-const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-
-app.post("/api/register", async (req, res) => {
-    try {
-        const { username, password, ref } = req.body;
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-        const novo = new User({ username: username.trim().toLowerCase(), password: hashedPassword, indicadoPor: ref || null });
-        await novo.save();
-        res.json({ success: true });
-    } catch (err) { res.status(400).json({ success: false }); }
-});
-
-app.post("/api/login", async (req, res) => {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
-    if (user && await bcrypt.compare(password, user.password)) {
-        return res.json({ success: true, username: user.username, saldo: user.saldo });
-    }
-    res.status(400).json({ success: false });
-});
-
-app.post("/api/aposta", apostaLimiter, async (req, res) => {
+// --- MODIFICAÇÃO 3: ROTA PARA GERAR PIX VIA BSPAY ---
+app.post("/api/gerar-pix", async (req, res) => {
     const { username, valor } = req.body;
 
-    if (!username || typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
+    try {
+        // 1. Verificar se o usuário existe
+        const user = await User.findOne({ username: username.trim().toLowerCase() });
+        if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
+
+        // 2. Chamar a API da BSPAY usando o Proxy
+        // Ajuste a URL e o Body conforme a documentação da BSPAY
+        const response = await axios.post('https://api.bspay.co', {
+            amount: valor,
+            external_id: crypto.randomBytes(8).toString('hex'),
+            payer: {
+                name: user.username,
+                document: "00000000000" // Exemplo, ajuste conforme seu formulário
+            }
+        }, {
+            httpsAgent: agent, // USA O IP FIXO DO FIXIE AQUI
+            proxy: false,
+            headers: {
+                'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`, // Seu token no .env
+                'Content-Type': 'application/json'
+            }
+        });
+
+        res.json({ success: true, pix: response.data });
+    } catch (error) {
+        console.error("[BSPAY ERROR] Status:", error.response?.status);
+        console.error("Detalhes:", error.response?.data || error.message);
+        
+        if (error.response?.status === 403) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Erro 403: Verifique se os IPs do Fixie foram liberados no painel da BSPAY." 
+            });
+        }
+        res.status(500).json({ success: false, message: "Erro ao gerar PIX" });
     }
-
-    const ganhou = Math.random() < globalRTP;
-
-    // SEMPRE subtrai o valor da aposta (independente de ganhar ou perder)
-    const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
-        { $inc: { saldo: -valor } },
-        { new: true }
-    );
-
-    if (!atualizado) {
-        return res.status(400).json({ success: false, message: "Saldo insuficiente" });
-    }
-
-    // Comissão de indicação (jogador apostou, casa fica com o valor se perder)
-    if (!ganhou && atualizado.indicadoPor) {
-        await User.findOneAndUpdate(
-            { username: atualizado.indicadoPor },
-            { $inc: { comissao: valor * 0.10 } }
-        );
-    }
-
-    // Se ganhou, gerar token de prêmio (uso único)
-    let premioToken = null;
-    if (ganhou) {
-        premioToken = crypto.randomBytes(32).toString('hex');
-        await User.findOneAndUpdate(
-            { username: username.trim().toLowerCase() },
-            { $set: { premioToken: premioToken, premioValor: valor } }
-        );
-    }
-
-    res.json({ success: true, saldo: atualizado.saldo, ganhou, premioToken });
 });
 
-app.post("/api/premio", premioLimiter, async (req, res) => {
-    const { username, premioToken } = req.body;
+// ... (Restante das suas rotas /api/register, /api/login, /api/aposta, etc continuam iguais) ...
 
-    if (!username || !premioToken) {
-        return res.status(400).json({ success: false, message: "Dados inválidos" });
-    }
-
-    // Buscar e INVALIDAR o token atomicamente (só pode usar uma vez)
-    const user = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
-        { $set: { premioToken: null } },
-        { new: false }
-    );
-
-    if (!user || !user.premioValor) {
-        return res.status(400).json({ success: false, message: "Token inválido ou já utilizado" });
-    }
-
-    const premio = user.premioValor * 3;
-
-    const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase() },
-        { $inc: { saldo: premio }, $set: { premioValor: null } },
-        { new: true }
-    );
-
-    res.json({ success: true, saldo: atualizado.saldo });
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => {
+    console.log(`🚀 Servidor rodando na porta ${process.env.PORT || 10000}`);
 });
-
-app.get("/api/saldo", async (req, res) => {
-    const user = await User.findOne({ username: req.query.user?.trim().toLowerCase() });
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    res.json({ success: true, saldo: user.saldo });
-});
-
-// NOVO: ROTA PARA JOGADOR SOLICITAR SAQUE
-app.post("/api/solicitar-saque", async (req, res) => {
-    const { username, valor, pix } = req.body;
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
-    if (!user || user.saldo < valor) return res.status(400).json({ success: false });
-
-    await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: -valor } });
-    await new Saque({ username: user.username, valor, chavePix: pix }).save();
-    res.json({ success: true });
-});
-
-// --- ROTAS ADMIN ---
-app.post("/admin/usuarios", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
-    res.json({ success: true, usuarios: users });
-});
-
-app.post("/admin/saques-pendentes", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    const saques = await Saque.find({ status: "pendente" });
-    res.json({ success: true, saques });
-});
-
-app.post("/admin/set-rtp", (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    globalRTP = parseFloat(req.body.rtp);
-    res.json({ success: true });
-});
-
-app.get("/admin/get-rtp", (req, res) => res.json({ rtp: globalRTP }));
-
-app.post("/admin/add-saldo", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    await User.findOneAndUpdate({ username: req.body.username }, { $inc: { saldo: parseFloat(req.body.valor) } });
-    res.json({ success: true });
-});
-
-app.listen(process.env.PORT || 10000, '0.0.0.0');
