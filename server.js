@@ -285,7 +285,10 @@ app.post("/admin/set-rtp", (req, res) => {
     res.json({ success: true });
 });
 
-app.get("/admin/get-rtp", (req, res) => res.json({ rtp: globalRTP }));
+app.post("/admin/get-rtp", (req, res) => {
+    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+    res.json({ success: true, rtp: globalRTP });
+});
 
 app.post("/admin/add-saldo", async (req, res) => {
     if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
