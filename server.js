@@ -76,15 +76,16 @@ app.post("/api/gerar-pix", async (req, res) => {
             postbackUrl: `https://${req.get('host')}/api/callback-pix`
         };
 
-        // Chamada via Axios usando o Túnel do Fixie
-        const response = await axios.post('https://api.bspay.co', payload, {
-            httpsAgent: agent,
-            proxy: false,
-            headers: {
-                'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
-        });
+       // Chamada via Axios usando o Túnel do Fixie (CORRIGIDO)
+const response = await axios.post('https://api.bspay.co', payload, {
+    httpsAgent: agent,
+    proxy: false,
+    headers: {
+        'Authorization': `Bearer ${process.env.BSPAY_TOKEN}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+    }
+});
 
         res.json({ 
             success: true, 
