@@ -794,10 +794,8 @@ async function gerarPix() {
         const data = await res.json();
 
         if(data.success) {
-            // A BSPAY envia o link da imagem no campo 'qrcode'
-            // E o código para copiar no 'pix_copy_paste'
             document.getElementById("qR").innerHTML = `
-                <img src="${data.qrcode}" width="180" style="border-radius:8px; background:white; padding:5px;"><br>
+                <img src="${data.qrcode_image}" width="180" style="border-radius:8px; background:white; padding:5px;"><br>
                 <p style="color:#aaa; font-size:9px; margin-top:5px;">Pix Copia e Cola:</p>
                 <input type="text" value="${data.pix_copy_paste}" readonly style="width:100%; font-size:10px; padding:5px; background:#222; color:white; border:1px solid #444; border-radius:4px;">
                 <button class="btn-finance btn-dep" style="margin-top:10px; font-size:10px" onclick="atualizarSaldoDoServidor()">Já paguei! Atualizar Saldo</button>
