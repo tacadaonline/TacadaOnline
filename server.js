@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 
-// --- MODIFICAÇÃO: IMPORTAÇÃO PARA O PROXY E API ---
+// --- IMPORTAÇÃO PARA O PROXY E API ---
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -16,10 +16,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, ".")));
 
-// --- MODIFICAÇÃO: CONFIGURAÇÃO DO AGENTE FIXIE ---
-// Certifique-se de adicionar FIXIE_URL no painel do Render
+// --- CONFIGURAÇÃO DO AGENTE FIXIE ---
 const proxyUrl = process.env.FIXIE_URL;
-const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : null;
+// Agente configurado com timeout para evitar o erro 'undefined'
+const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl, { keepAlive: true, timeout: 10000 }) : null;
+
+if (proxyUrl) {
+    console.log("✅ Proxy FIXIE configurado no servidor.");
+} else {
+    console.error("❌ AVISO: FIXIE_URL não encontrada nas variáveis de ambiente.");
+}
 
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_PASSWORD_FIXA = process.env.ADMIN_PASS || "mude-isso-no-env"; 
@@ -51,23 +57,28 @@ const SaqueSchema = new mongoose.Schema({
 const Saque = mongoose.model("Saque", SaqueSchema);
 
 // --- LIMITADORES ---
-const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 
 // --- ROTA: GERAR PIX (BSPAY COM PROXY) ---
 app.post("/api/gerar-pix", async (req, res) => {
     const { username, valor, cpf, email } = req.body;
 
     try {
-        // --- TESTE DE IP PARA VER NO LOG DO RENDER ---
-        const testeIp = await axios.get('https://api.ipify.org', { 
-            httpsAgent: agent, 
-            proxy: false 
-        });
-        console.log("CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip); 
+        // --- TESTE DE IP CORRIGIDO (PARA VER NO LOG DO RENDER) ---
+        try {
+            const testeIp = await axios.get('https://api.ipify.org', { 
+                httpsAgent: agent, 
+                proxy: false,
+                timeout: 5000 
+            });
+            console.log("📡 CONFIRMAÇÃO: Saindo pelo IP:", testeIp.data.ip); 
+        } catch (e) {
+            console.error("⚠️ Falha ao verificar IP do Proxy:", e.message);
+        }
 
         const payload = {
-            amount: valor,
+            amount: parseFloat(valor),
             external_id: crypto.randomBytes(12).toString('hex'),
             payerQuestion: "Deposito no Jogo",
             payer: {
@@ -78,7 +89,7 @@ app.post("/api/gerar-pix", async (req, res) => {
             postbackUrl: `https://${req.get('host')}/api/callback-pix`
         };
 
-        // --- CHAMADA CORRIGIDA COM A URL DA DOCUMENTAÇÃO ---
+        // --- CHAMADA COM URL COMPLETA E HEADERS ---
         const response = await axios.post('https://api.bspay.co', payload, {
             httpsAgent: agent,
             proxy: false,
@@ -96,17 +107,17 @@ app.post("/api/gerar-pix", async (req, res) => {
         });
 
     } catch (error) {
-        console.error("ERRO NO PROXY OU API:", error.message);
+        console.error("❌ ERRO NA API BSPAY:", error.message);
         if (error.response) {
             console.log("Status do Erro:", error.response.status);
-            // Aqui vai mostrar se o erro 403 é IP ou Token
-            console.log("Detalhes:", error.response.data); 
+            console.log("Detalhes do Servidor:", error.response.data); 
         }
-        res.status(500).json({ success: false, message: "Erro na comunicação com o gateway" });
+        res.status(500).json({ success: false, message: "Erro ao gerar PIX. Verifique os logs." });
     }
 });
 
-// --- ROTAS DE USUÁRIO ---
+// --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
+
 app.post("/api/register", async (req, res) => {
     try {
         const { username, password, ref } = req.body;
@@ -178,7 +189,6 @@ app.post("/api/solicitar-saque", async (req, res) => {
     res.json({ success: true });
 });
 
-// --- ROTAS ADMIN ---
 app.post("/admin/usuarios", async (req, res) => {
     if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
     const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
