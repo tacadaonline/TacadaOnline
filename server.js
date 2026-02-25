@@ -157,10 +157,22 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
             }
         });
 
+        // Log completo para debug - ver exatamente o que a BSPAY retorna
+        console.log("📦 RESPOSTA COMPLETA DA BSPAY:", JSON.stringify(response.data, null, 2));
+
+        const dados = response.data;
+
+        // Mapeamento inteligente - tenta vários nomes de campos possíveis
+        const qrcode = dados.qrcode || dados.qr_code || dados.qrCode || dados.qr_code_base64 || dados.qrcode_url || dados.image || dados.qr_code_url || null;
+        const pixCopiaECola = dados.pix_copy_paste || dados.pixCopiaECola || dados.pix_code || dados.emv || dados.brcode || dados.payload || dados.copy_paste || dados.qrcode_text || null;
+
+        console.log("🔍 QR Code encontrado?", !!qrcode, "->", typeof qrcode === 'string' ? qrcode.substring(0, 50) + "..." : qrcode);
+        console.log("🔍 Pix Copia e Cola encontrado?", !!pixCopiaECola, "->", typeof pixCopiaECola === 'string' ? pixCopiaECola.substring(0, 50) + "..." : pixCopiaECola);
+
         res.json({ 
             success: true, 
-            qrcode: response.data.qrcode, 
-            pix_copy_paste: response.data.pix_copy_paste 
+            qrcode: qrcode, 
+            pix_copy_paste: pixCopiaECola 
         });
 
     } catch (error) {
