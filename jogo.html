@@ -717,10 +717,11 @@ function finalizarJogo(ganhouVisivel) {
         alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
 
         // Chamar endpoint de prêmio para creditar o ganho
+        const token = localStorage.getItem("token");
         fetch("/api/premio", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username: usuarioLogado, premioToken: window.premioToken })
+            headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+            body: JSON.stringify({ premioToken: window.premioToken })
         })
         .then(r => r.json())
         .then(data => {
