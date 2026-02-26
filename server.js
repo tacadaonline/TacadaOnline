@@ -238,8 +238,9 @@ app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
     res.json({ success: true, saldo: atualizado.saldo, ganhou, premioToken });
 });
 
-app.post("/api/premio", premioLimiter, async (req, res) => {
-    const { username, premioToken } = req.body;
+app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
+    const username = req.usuario.username;
+    const { premioToken } = req.body;
     const user = await User.findOneAndUpdate(
         { username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
         { $set: { premioToken: null } },
