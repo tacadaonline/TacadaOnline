@@ -126,7 +126,7 @@ let branca = { x: 0, y: 0, r: 8 },
 
 /* ===== INICIALIZAR POSIÇÕES =====*/
 function sortearPosicoes() {
-    const m = -3; 
+    const m = 2; 
     const cantos = [
         {x: m, y: m}, 
         {x: canvas.width - m, y: m}, 
@@ -139,12 +139,30 @@ function sortearPosicoes() {
     const centroX = canvas.width / 2;
     const centroY = canvas.height / 2;
 
-    // Posicionamento normal para todas as jogadas
-    dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
-    dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+    if (window.resultadoFinal === false) {
+        // PERDEU: posicionar bolas com ângulo difícil
+        const offsetBase = 50 + Math.random() * 30; // 50-80px
+        const lado = Math.random() > 0.5 ? 1 : -1;
+        
+        dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
+        dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
+        
+        dourada.x += offsetBase * lado;
+        dourada.y -= offsetBase * lado * 0.5;
+        
+        dourada.x = Math.max(dourada.r + 10, Math.min(canvas.width - dourada.r - 10, dourada.x));
+        dourada.y = Math.max(dourada.r + 10, Math.min(canvas.height - dourada.r - 10, dourada.y));
+        
+        branca.x = dourada.x + (hole.x < centroX ? 80 : -80);
+        branca.y = dourada.y + (hole.y < centroY ? 80 : -80);
+    } else {
+        // GANHOU: posição alinhada (fácil)
+        dourada.x = (hole.x < centroX) ? centroX + 40 : centroX - 40;
+        dourada.y = (hole.y < centroY) ? centroY + 40 : centroY - 40;
 
-    branca.x = dourada.x + (hole.x < centroX ? 70 : -70);
-    branca.y = dourada.y + (hole.y < centroY ? 70 : -70);
+        branca.x = dourada.x + (hole.x < centroX ? 70 : -70);
+        branca.y = dourada.y + (hole.y < centroY ? 70 : -70);
+    }
     
     // Garantir ambas dentro dos limites
     branca.x = Math.max(branca.r + 5, Math.min(canvas.width - branca.r - 5, branca.x));
@@ -314,6 +332,23 @@ function atualizarFisica() {
             velocidadeBranca.y -= (v_dot * uy) * 0.9;
             velocidadeDourada.x += (v_dot * ux) * 0.9;
             velocidadeDourada.y += (v_dot * uy) * 0.9;
+
+            // FÍSICA GUIADA: desvio sutil na colisão quando servidor disse "perdeu"
+            if (window.resultadoFinal === false) {
+                const perpX = -uy;
+                const perpY = ux;
+                const toCacapaX = hole.x - dourada.x;
+                const toCacapaY = hole.y - dourada.y;
+                const dotPerp = perpX * toCacapaX + perpY * toCacapaY;
+                const direcao = dotPerp > 0 ? -1 : 1;
+                const velocidadeAtual = Math.sqrt(
+                    velocidadeDourada.x * velocidadeDourada.x +
+                    velocidadeDourada.y * velocidadeDourada.y
+                );
+                const intensidadeDesvio = velocidadeAtual * 0.06;
+                velocidadeDourada.x += perpX * direcao * intensidadeDesvio;
+                velocidadeDourada.y += perpY * direcao * intensidadeDesvio;
+            }
         }
     }
 
@@ -323,7 +358,7 @@ function atualizarFisica() {
     const distHole = Math.sqrt(dxHole * dxHole + dyHole * dyHole);
 
     if (distHole < hole.r) {
-        finalizarJogo(true);
+        finalizarJogo(window.resultadoFinal ? true : false);
         return;
     }
 
@@ -620,7 +655,8 @@ async function confirmBet() {
             return;
         }
 
-        // Guardar token de prêmio para uso na finalização
+        // Guardar resultado e token de prêmio para uso na finalização
+        window.resultadoFinal = data.ganhou;
         window.premioToken = data.premioToken || null;
 
         // Setar estado ANTES de qualquer outra coisa
@@ -651,15 +687,16 @@ async function confirmBet() {
 }
 
 /* NOVO FINALIZAR JOGO (Substitua no HTML) */
-function finalizarJogo(bolaEntrou) {
+function finalizarJogo(ganhouVisivel) {
     jogoAtivo = false;
     timerAtivo = false;
 
-    if (!bolaEntrou) {
-        // Bola não entrou na caçapa
+    if (!ganhouVisivel) {
         alert("❌ Não foi dessa vez!");
-    } else {
-        // Bola entrou — tentar receber prêmio via token do servidor
+    } else if (ganhouVisivel && window.resultadoFinal) {
+        const ganhoTotal = valorAposta * 3;
+        alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
+
         const token = localStorage.getItem("token");
         fetch("/api/premio", {
             method: "POST",
@@ -669,17 +706,15 @@ function finalizarJogo(bolaEntrou) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                const ganhoTotal = valorAposta * 3;
                 setSaldo(data.saldo);
-                alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
-            } else {
-                alert("❌ Não foi dessa vez!");
             }
         })
         .catch(e => {
             console.log("Erro ao receber prêmio:", e);
-            alert("❌ Não foi dessa vez!");
+            alert("⚠️ Erro ao creditar prêmio. Entre em contato com o suporte.");
         });
+    } else if (ganhouVisivel && !window.resultadoFinal) {
+        alert("❌ Não foi dessa vez!");
     }
 
     // Cancelar qualquer refetch pendente
@@ -696,9 +731,6 @@ function finalizarJogo(bolaEntrou) {
     apostando = false;
     gameLoopRunning = false;
     document.getElementById("confirm").disabled = false;
-
-    // NÃO fazer refetch aqui — o saldo do servidor (setSaldo) já está correto
-    // desde o confirmBet(). Refetch só acontece em: onload, depósito PIX, saque, aposta falha.
 
     setTimeout(sortearPosicoes, 1000);
 }
