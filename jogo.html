@@ -895,6 +895,25 @@ async function fazerSaque() {
 function fecharModal() { 
     document.getElementById("modalFinanceiro").style.display = "none"; 
 }
+ // Bloquear F12, Ctrl+Shift+I/J/U e botão direito do mouse
+document.addEventListener('keydown', function(e) {
+    // F12
+    if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        return false;
+    }
+    // Ctrl+Shift+I/J/U
+    if ((e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'U' || e.key === 'u')) ||
+        (e.ctrlKey && (e.key === 'U' || e.key === 'u'))) {
+        e.preventDefault();
+        return false;
+    }
+});
+// Desabilitar menu do botão direito do mouse
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
 
 window.onload = () => { 
     sortearPosicoes(); 
