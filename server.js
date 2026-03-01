@@ -188,13 +188,14 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
-app.post("/api/callback-pix", pixLimiter, async (req, res) => {
+app.post("/api/callback-pix", async (req, res) => {
     console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
 
     try {
         const { status, amount, payer } = req.body;
 
-        if (status === "paid" || status === "approved" || status === "confirmed") {
+        const statusLower = (status || "").toString().toLowerCase();
+        if (statusLower === "paid" || statusLower === "approved" || statusLower === "confirmed" || statusLower === "completed") {
             const valor = parseFloat(amount);
             const username = payer?.name?.trim()?.toLowerCase();
 
