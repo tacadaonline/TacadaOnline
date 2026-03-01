@@ -61,7 +61,7 @@ const bspayService = {
           document: (dados.cpf || "00000000000").replace(/\D/g, ''),
           email: dados.email || `${dados.username}@email.com`
         },
-        postbackUrl: "https://tacadaonline-beckend.onrender.com"
+        postbackUrl: "https://tacadaonline-beckend.onrender.com/api/callback-pix"
       };
 
       console.log(`[BSPAY] Tentando gerar PIX via Fixie...`);

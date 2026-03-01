@@ -188,9 +188,41 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
-app.post("/api/callback-pix", (req, res) => {
-    console.log("📩 Callback PIX recebido:", req.body);
-    res.json({ received: true });
+app.post("/api/callback-pix", pixLimiter, async (req, res) => {
+    console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
+
+    try {
+        const { status, amount, payer } = req.body;
+
+        if (status === "paid" || status === "approved" || status === "confirmed") {
+            const valor = parseFloat(amount);
+            const username = payer?.name?.trim()?.toLowerCase();
+
+            if (!username || isNaN(valor) || valor <= 0) {
+                console.log("❌ Callback PIX com dados inválidos:", { username, valor });
+                return res.status(400).json({ received: true, error: "Dados inválidos" });
+            }
+
+            const atualizado = await User.findOneAndUpdate(
+                { username: username },
+                { $inc: { saldo: valor } },
+                { new: true }
+            );
+
+            if (atualizado) {
+                console.log(`✅ Saldo atualizado para ${username}: +R$ ${valor.toFixed(2)} (Novo saldo: R$ ${atualizado.saldo.toFixed(2)})`);
+            } else {
+                console.log(`❌ Usuário não encontrado: ${username}`);
+            }
+        } else {
+            console.log(`⚠️ Status do PIX não é pago: ${status}`);
+        }
+
+        res.json({ received: true });
+    } catch (e) {
+        console.error("❌ Erro no callback PIX:", e);
+        res.status(500).json({ received: true, error: "Erro interno" });
+    }
 });
 
 app.post("/api/register", async (req, res) => {
