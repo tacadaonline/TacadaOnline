@@ -209,14 +209,16 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
-app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
+app.post("/api/callback-pix", async (req, res) => {
     console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
 
     try {
-        const body = req.body;
+        const rawBody = req.body;
+        // BSPAY envia os dados dentro de requestBody — extrair corretamente
+        const body = rawBody.requestBody || rawBody;
         const status = (body.status || "").toString().toLowerCase();
-        const externalId = body.external_id || body.externalId || body.id;
-        if (!body.external_id && !body.externalId && body.id) {
+        const externalId = body.external_id || body.externalId || body.id || body.transactionId;
+        if (!body.external_id && !body.externalId && !body.transactionId && body.id) {
             console.log(`⚠️ Callback usa campo 'id' como fallback para external_id: ${body.id}`);
         }
 
