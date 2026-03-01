@@ -104,10 +104,21 @@ const SaqueSchema = new mongoose.Schema({
 });
 const Saque = mongoose.model("Saque", SaqueSchema);
 
+const DepositoSchema = new mongoose.Schema({
+    external_id: { type: String, required: true, unique: true },
+    username: { type: String, required: true },
+    valor: { type: Number, required: true },
+    status: { type: String, default: "pendente" }, // pendente | pago
+    created_at: { type: Date, default: Date.now },
+    paid_at: { type: Date, default: null }
+});
+const Deposito = mongoose.model("Deposito", DepositoSchema);
+
 // --- LIMITADORES ---
 const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const pixLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const callbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
 // --- SANITIZAR ---
 function sanitizar(str) {
@@ -135,9 +146,10 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
     try {
         const accessToken = await obterTokenBspay();
+        const externalId = crypto.randomBytes(12).toString('hex');
         const payload = {
             amount: parseFloat(valor),
-            external_id: crypto.randomBytes(12).toString('hex'),
+            external_id: externalId,
             payerQuestion: "Deposito no Jogo",
             payer: {
                 name: username,
@@ -160,6 +172,15 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
         // Log completo para debug - ver exatamente o que a BSPAY retorna
         console.log("📦 RESPOSTA COMPLETA DA BSPAY:", JSON.stringify(response.data, null, 2));
+
+        // Salvar depósito pendente para rastrear pelo external_id no callback
+        await new Deposito({
+            external_id: externalId,
+            username: username,
+            valor: parseFloat(valor),
+            status: "pendente"
+        }).save();
+        console.log(`💾 Depósito pendente salvo: ${externalId} para ${username} R$ ${parseFloat(valor).toFixed(2)}`);
 
         const dados = response.data;
 
@@ -188,35 +209,51 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
-app.post("/api/callback-pix", async (req, res) => {
+app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
     console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
 
     try {
-        const { status, amount, payer } = req.body;
+        const body = req.body;
+        const status = (body.status || "").toString().toLowerCase();
+        const externalId = body.external_id || body.externalId || body.id;
+        if (!body.external_id && !body.externalId && body.id) {
+            console.log(`⚠️ Callback usa campo 'id' como fallback para external_id: ${body.id}`);
+        }
 
-        const statusLower = (status || "").toString().toLowerCase();
-        if (statusLower === "paid" || statusLower === "approved" || statusLower === "confirmed" || statusLower === "completed") {
-            const valor = parseFloat(amount);
-            const username = payer?.name?.trim()?.toLowerCase();
+        if (!["paid", "approved", "confirmed", "completed"].includes(status)) {
+            console.log(`⚠️ Status do PIX não é pago: ${body.status}`);
+            return res.json({ received: true });
+        }
 
-            if (!username || isNaN(valor) || valor <= 0) {
-                console.log("❌ Callback PIX com dados inválidos:", { username, valor });
-                return res.status(400).json({ received: true, error: "Dados inválidos" });
-            }
+        if (!externalId) {
+            console.log("❌ Callback sem external_id:", body);
+            return res.status(400).json({ received: true, error: "Sem external_id" });
+        }
 
-            const atualizado = await User.findOneAndUpdate(
-                { username: username },
-                { $inc: { saldo: valor } },
-                { new: true }
-            );
+        // Buscar depósito e marcar como pago atomicamente (evita crédito duplicado)
+        // new: false retorna o documento ANTES da atualização; null significa que já foi processado
+        const deposito = await Deposito.findOneAndUpdate(
+            { external_id: externalId.toString(), status: "pendente" },
+            { $set: { status: "pago", paid_at: new Date() } },
+            { new: false }
+        );
 
-            if (atualizado) {
-                console.log(`✅ Saldo atualizado para ${username}: +R$ ${valor.toFixed(2)} (Novo saldo: R$ ${atualizado.saldo.toFixed(2)})`);
-            } else {
-                console.log(`❌ Usuário não encontrado: ${username}`);
-            }
+        if (!deposito) {
+            console.log(`⚠️ Depósito não encontrado ou já pago: ${externalId}`);
+            return res.json({ received: true });
+        }
+
+        // Creditar saldo ao usuário correto
+        const atualizado = await User.findOneAndUpdate(
+            { username: deposito.username },
+            { $inc: { saldo: deposito.valor } },
+            { new: true }
+        );
+
+        if (atualizado) {
+            console.log(`✅ Saldo atualizado para ${deposito.username}: +R$ ${deposito.valor.toFixed(2)} (Novo saldo: R$ ${atualizado.saldo.toFixed(2)}) [ext_id: ${externalId}]`);
         } else {
-            console.log(`⚠️ Status do PIX não é pago: ${status}`);
+            console.log(`❌ Usuário não encontrado: ${deposito.username}`);
         }
 
         res.json({ received: true });
