@@ -21,6 +21,8 @@ fbq('track', 'PageView');
 src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   @keyframes ambientPulse {
@@ -411,6 +413,21 @@ const aimLine = document.getElementById("aim-line");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
 
+// Pre-render felt texture pattern once for performance
+const feltOffscreen = document.createElement("canvas");
+feltOffscreen.width = canvas.width;
+feltOffscreen.height = canvas.height;
+const feltCtx = feltOffscreen.getContext("2d");
+feltCtx.globalAlpha = 0.03;
+feltCtx.strokeStyle = "#000000";
+feltCtx.lineWidth = 1;
+for (let y = 0; y < canvas.height; y += 3) {
+    feltCtx.beginPath();
+    feltCtx.moveTo(0, y);
+    feltCtx.lineTo(canvas.width, y);
+    feltCtx.stroke();
+}
+
 let branca = { x: 0, y: 0, r: 8 }, 
     dourada = { x: 0, y: 0, r: 8 }, 
     hole = { x: 0, y: 0, r: 10 };
@@ -478,18 +495,8 @@ function sortearPosicoes() {
 function desenhar() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Textura de feltro (linhas horizontais sutis)
-    ctx.save();
-    ctx.globalAlpha = 0.03;
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 1;
-    for (let y = 0; y < canvas.height; y += 3) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    ctx.restore();
+    // Textura de feltro (pré-renderizada, desempenho otimizado)
+    ctx.drawImage(feltOffscreen, 0, 0);
 
     // Vinheta nas bordas
     const vignette = ctx.createRadialGradient(
