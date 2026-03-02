@@ -341,6 +341,19 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
     border-color: #FFD700;
     box-shadow: 0 0 0 2px rgba(255,215,0,0.15);
   }
+
+  .btn-fechar-modal {
+    color: rgba(232,213,163,0.4);
+    background: none;
+    border: none;
+    margin-top: 15px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+    transition: color 0.2s;
+  }
+
+  .btn-fechar-modal:hover { color: #E8D5A3; }
 </style>
 </head>
 <body>
@@ -376,7 +389,7 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 <div id="modalFinanceiro" class="modal">
   <div class="modal-content">
     <div id="conteudo-modal"></div>
-    <button onclick="fecharModal()" style="color:rgba(232,213,163,0.4); background:none; border:none; margin-top:15px; font-size:12px; cursor:pointer; font-family:'Lexend','Segoe UI',Arial,sans-serif; transition:color 0.2s;" onmouseover="this.style.color='#E8D5A3'" onmouseout="this.style.color='rgba(232,213,163,0.4)'">[ FECHAR JANELA ]</button>
+    <button onclick="fecharModal()" class="btn-fechar-modal">[ FECHAR JANELA ]</button>
   </div>
 </div>
 
@@ -413,7 +426,7 @@ const aimLine = document.getElementById("aim-line");
 canvas.width = window.innerWidth * 0.94;
 canvas.height = canvas.width * 0.80;
 
-// Pre-render felt texture pattern once for performance
+// Pre-render felt texture pattern once for performance (single path for efficiency)
 const feltOffscreen = document.createElement("canvas");
 feltOffscreen.width = canvas.width;
 feltOffscreen.height = canvas.height;
@@ -421,12 +434,20 @@ const feltCtx = feltOffscreen.getContext("2d");
 feltCtx.globalAlpha = 0.03;
 feltCtx.strokeStyle = "#000000";
 feltCtx.lineWidth = 1;
+feltCtx.beginPath();
 for (let y = 0; y < canvas.height; y += 3) {
-    feltCtx.beginPath();
     feltCtx.moveTo(0, y);
     feltCtx.lineTo(canvas.width, y);
-    feltCtx.stroke();
 }
+feltCtx.stroke();
+
+// Pre-compute vignette gradient (canvas size is fixed after init)
+const vignetteGradient = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+    canvas.width / 2, canvas.height / 2, canvas.height * 0.8
+);
+vignetteGradient.addColorStop(0, "rgba(0,0,0,0)");
+vignetteGradient.addColorStop(1, "rgba(0,0,0,0.35)");
 
 let branca = { x: 0, y: 0, r: 8 }, 
     dourada = { x: 0, y: 0, r: 8 }, 
@@ -498,14 +519,8 @@ function desenhar() {
     // Textura de feltro (pré-renderizada, desempenho otimizado)
     ctx.drawImage(feltOffscreen, 0, 0);
 
-    // Vinheta nas bordas
-    const vignette = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.8
-    );
-    vignette.addColorStop(0, "rgba(0,0,0,0)");
-    vignette.addColorStop(1, "rgba(0,0,0,0.35)");
-    ctx.fillStyle = vignette;
+    // Vinheta nas bordas (gradiente pré-calculado)
+    ctx.fillStyle = vignetteGradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Marca central decorativa
