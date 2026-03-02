@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tacada Online - Cadastro</title>
+    <title>Tacadiinha — Crie sua Conta VIP</title>
     <!-- Meta Pixel Code -->
     <script>
     !function(f,b,e,v,n,t,s)
@@ -21,30 +21,587 @@
     src="https://www.facebook.com/tr?id=1665967567715510&ev=PageView&noscript=1"
     /></noscript>
     <!-- End Meta Pixel Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #0d0d0d; color: #ffffff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        .banner { width: 100%; max-width: 400px; border: 2px solid #d4af37; border-radius: 15px 15px 0 0; overflow: hidden; display: flex; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-        .banner img { width: 100%; height: auto; display: block; opacity: 0.9; }
-        .login-container { width: 90%; max-width: 400px; background: #1a1a1a; padding: 30px; border-radius: 0 0 15px 15px; border: 2px solid #d4af37; border-top: none; box-sizing: border-box; text-align: center; }
-        h2 { color: #d4af37; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; font-size: 20px; }
-        input { width: 100%; padding: 14px; margin: 10px 0; background: #262626; border: 1px solid #444; border-radius: 8px; color: white; box-sizing: border-box; font-size: 16px; }
-        .btn-cad { width: 100%; padding: 15px; margin-top: 15px; background: linear-gradient(to right, #d4af37, #f2d06b); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; text-transform: uppercase; }
-        .footer-link { margin-top: 15px; font-size: 13px; color: #888; }
-        .footer-link a { color: #d4af37; text-decoration: none; font-weight: bold; }
-        #erro { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; color: #ff4d4d; }
+        :root {
+            --gold-primary: #D4A843;
+            --gold-light: #F4E4BA;
+            --green-deep: #1A7A4C;
+            --green-soft: #2ECC71;
+            --bg-primary: #0A0A0F;
+            --bg-card: #141420;
+            --bg-input: #1A1A2E;
+            --text-primary: #E8E8E8;
+            --text-secondary: #9A9AB0;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-size: 16px;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+            overflow-x: hidden;
+        }
+
+        /* Ambient background */
+        .bg-ambiance {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse 60% 40% at 20% 10%, rgba(212,168,67,0.07) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 35% at 80% 80%, rgba(26,122,76,0.06) 0%, transparent 70%);
+        }
+
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Header */
+        .header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4px;
+            animation: fadeInUp 0.4s ease both;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 22px;
+            background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-icon { font-size: 26px; -webkit-text-fill-color: initial; }
+
+        .online-counter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(26,122,76,0.15);
+            border: 1px solid rgba(46,204,113,0.3);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--green-soft);
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green-soft);
+            animation: pulse 2s infinite;
+        }
+
+        /* Hero */
+        .hero {
+            width: 100%;
+            text-align: center;
+            animation: fadeInUp 0.5s 0.1s ease both;
+        }
+
+        .badge-exclusive {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(212,168,67,0.12);
+            border: 1px solid rgba(212,168,67,0.4);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gold-primary);
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+
+        .hero h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: clamp(22px, 6vw, 30px);
+            line-height: 1.2;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .hero-sub {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        /* Step indicator */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeInUp 0.5s 0.15s ease both;
+        }
+
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(154,154,176,0.3);
+        }
+
+        .step-dot.active {
+            background: var(--gold-primary);
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Form card */
+        .form-card {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid rgba(212,168,67,0.25);
+            border-radius: 20px;
+            padding: 28px 24px;
+            animation: fadeInUp 0.5s 0.25s ease both;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .form-title {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 20px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .form-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .field-group {
+            margin-bottom: 14px;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            pointer-events: none;
+        }
+
+        .input-valid-icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: var(--green-soft);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            height: 56px;
+            padding: 0 44px 0 44px;
+            background: var(--bg-input);
+            border: 1.5px solid rgba(154,154,176,0.2);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: rgba(212,168,67,0.5);
+        }
+
+        input[type="text"].valid,
+        input[type="password"].valid {
+            border-color: rgba(46,204,113,0.5);
+        }
+
+        input[type="text"].valid + .input-valid-icon,
+        input[type="password"].valid + .input-valid-icon {
+            opacity: 1;
+        }
+
+        input::placeholder { color: var(--text-secondary); font-size: 14px; }
+
+        .btn-cad {
+            width: 100%;
+            height: 56px;
+            margin-top: 6px;
+            background: linear-gradient(135deg, #D4A843 0%, #F4E4BA 40%, #D4A843 100%);
+            color: #0A0A0F;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 24px rgba(212,168,67,0.35);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s, box-shadow 0.15s;
+            min-height: 44px;
+        }
+
+        .btn-cad::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer 2.5s infinite;
+        }
+
+        .btn-cad:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 28px rgba(212,168,67,0.45);
+        }
+
+        .btn-cad:disabled {
+            opacity: 0.75;
+            cursor: not-allowed;
+        }
+
+        #erro {
+            margin-top: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            min-height: 18px;
+            color: #ff5a5a;
+            text-align: center;
+        }
+
+        .footer-link {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .footer-link a {
+            color: var(--gold-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Testimonial */
+        .testimonial {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid rgba(212,168,67,0.15);
+            border-radius: 16px;
+            padding: 20px;
+            animation: fadeInUp 0.5s 0.35s ease both;
+        }
+
+        .testimonial-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .avatar-initials {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 14px;
+            color: #0A0A0F;
+            flex-shrink: 0;
+        }
+
+        .testimonial-meta {
+            flex: 1;
+        }
+
+        .testimonial-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .testimonial-location {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 1px;
+        }
+
+        .stars {
+            color: var(--gold-primary);
+            font-size: 13px;
+        }
+
+        .testimonial-quote {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(26,122,76,0.15);
+            border: 1px solid rgba(46,204,113,0.3);
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--green-soft);
+        }
+
+        /* Security badges */
+        .security-badges {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.5s 0.4s ease both;
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .badge-icon { font-size: 14px; }
+
+        /* Payment logos */
+        .payment-logos {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.5s 0.45s ease both;
+        }
+
+        .pay-pill {
+            background: rgba(154,154,176,0.08);
+            border: 1px solid rgba(154,154,176,0.15);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        /* Footer */
+        .footer {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+            animation: fadeInUp 0.5s 0.5s ease both;
+        }
+
+        .footer a {
+            color: var(--text-secondary);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .footer-links {
+            margin-top: 4px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        @keyframes shimmer {
+            0%   { left: -100%; }
+            100% { left: 200%; }
+        }
     </style>
 </head>
 <body>
-    <div class="banner">
-        <img src="https://i.ibb.co/Pz4YRY2M/29282366-d3a9-4b73-bf93-06d065467b0c.jpg" alt="Banner">
-    </div>
-    <div class="login-container">
-        <h2>Criar Conta</h2>
-        <input type="text" id="user" placeholder="Digite Seu Telefone">
-        <input type="password" id="pass" placeholder="Crie uma Senha">
-        <button class="btn-cad" id="btnCadastrar" onclick="cadastrar()">Finalizar Cadastro</button>
-        <div id="erro"></div>
-        <div class="footer-link">Já tem conta? <a href="index.html">Faça Login</a></div>
+    <div class="bg-ambiance"></div>
+
+    <div class="page-wrapper">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🎱</span>
+                Tacadiinha
+            </div>
+            <div class="online-counter">
+                <div class="pulse-dot"></div>
+                <span id="onlineCount">2.847</span> online
+            </div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="badge-exclusive">⚜ Clube Exclusivo</div>
+            <h1>A mesa está pronta.<br>A vaga é sua.</h1>
+            <p class="hero-sub">Crie sua conta e entre em campo agora</p>
+        </section>
+
+        <!-- Step indicator -->
+        <div class="step-indicator">
+            <div class="step-dot active"></div>
+            <div class="step-dot"></div>
+            <span class="step-label">Passo 1 de 2</span>
+        </div>
+
+        <!-- Form card -->
+        <div class="form-card">
+            <div class="form-header">
+                <div class="form-title">Crie sua conta VIP</div>
+                <div class="form-subtitle">Leva menos de 30 segundos</div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" for="user">Usuário / Telefone</label>
+                <div class="input-wrap">
+                    <span class="input-icon">✉️</span>
+                    <input type="text" id="user" placeholder="Digite seu telefone ou usuário" autocomplete="username">
+                    <span class="input-valid-icon">✓</span>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" for="pass">Senha</label>
+                <div class="input-wrap">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="pass" placeholder="Crie uma senha segura" autocomplete="new-password">
+                    <span class="input-valid-icon">✓</span>
+                </div>
+            </div>
+
+            <button class="btn-cad" id="btnCadastrar" onclick="cadastrar()">⚜ FINALIZAR CADASTRO</button>
+
+            <div id="erro"></div>
+
+            <div class="footer-link">Já tem conta? <a href="index.html">Faça Login</a></div>
+        </div>
+
+        <!-- Testimonial -->
+        <div class="testimonial">
+            <div class="testimonial-header">
+                <div class="avatar-initials">MR</div>
+                <div class="testimonial-meta">
+                    <div class="testimonial-name">Marcos R.</div>
+                    <div class="testimonial-location">São Paulo, SP</div>
+                    <div class="stars">★★★★★</div>
+                </div>
+            </div>
+            <p class="testimonial-quote">"Fiz meu primeiro saque em 3 minutos via Pix. A mesa é justa e a comunidade é top."</p>
+            <span class="verified-badge">✓ Saque verificado via Pix</span>
+        </div>
+
+        <!-- Security badges -->
+        <div class="security-badges">
+            <div class="badge"><span class="badge-icon">🔒</span> SSL 256-bit</div>
+            <div class="badge"><span class="badge-icon">🛡️</span> Jogo Auditado</div>
+            <div class="badge"><span class="badge-icon">⚡</span> Saque Instantâneo</div>
+        </div>
+
+        <!-- Payment logos -->
+        <div class="payment-logos">
+            <span class="pay-pill">PIX</span>
+            <span class="pay-pill">VISA</span>
+            <span class="pay-pill">MASTER</span>
+            <span class="pay-pill">BOLETO</span>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>© 2026 Tacadiinha</span>
+            <div class="footer-links">
+                <a href="#">Termos</a>
+                <a href="#">Privacidade</a>
+                <a href="#">Jogo Responsável</a>
+            </div>
+        </footer>
+
     </div>
 
     <script>
@@ -80,15 +637,35 @@
                 } else {
                     erroEl.innerText = data.message || data.msg || "Usuário já existe.";
                     btn.disabled = false;
-                    btn.innerText = "FINALIZAR CADASTRO";
+                    btn.innerText = "⚜ FINALIZAR CADASTRO";
                 }
             } catch (err) {
                 console.error("Erro no cadastro:", err);
                 erroEl.innerText = "Erro de conexão. Verifique o servidor.";
                 btn.disabled = false;
-                btn.innerText = "FINALIZAR CADASTRO";
+                btn.innerText = "⚜ FINALIZAR CADASTRO";
             }
         }
+
+        // Visual validation
+        document.getElementById('user').addEventListener('input', function() {
+            this.classList.toggle('valid', this.value.trim().length >= 3);
+        });
+        document.getElementById('pass').addEventListener('input', function() {
+            this.classList.toggle('valid', this.value.trim().length >= 3);
+        });
+
+        // Simulated online counter
+        (function() {
+            var base = 2847;
+            function update() {
+                base += Math.floor(Math.random() * 11) - 5;
+                if (base < 2500) base = 2500;
+                if (base > 3200) base = 3200;
+                document.getElementById('onlineCount').textContent = base.toLocaleString('pt-BR');
+            }
+            setInterval(update, 4000);
+        })();
     </script>
 </body>
 </html>
