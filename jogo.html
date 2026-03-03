@@ -413,6 +413,150 @@ let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 6; // canvas CSS border (px), used to sync SVG overlay coordinates
 
+/* ===== SISTEMA DE ÁUDIO =====*/
+let audioCtx = null;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playHitSound(velocidade) {
+    if (!audioCtx) return;
+    const vol = Math.min(1, Math.abs(velocidade) / 20);
+    const bufferSize = Math.floor(audioCtx.sampleRate * 0.08);
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.08);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+}
+
+let _lastWallSound = 0;
+function playWallSound() {
+    const now = Date.now();
+    if (now - _lastWallSound < 50) return;
+    _lastWallSound = now;
+    if (!audioCtx) return;
+    const bufferSize = Math.floor(audioCtx.sampleRate * 0.05);
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(300, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.05);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+}
+
+function playPocketSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.2);
+}
+
+function playWinSound() {
+    if (!audioCtx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t = audioCtx.currentTime + i * 0.1;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.5, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.1);
+    });
+}
+
+function playLoseSound() {
+    if (!audioCtx) return;
+    const notes = [329.63, 261.63]; // E4, C4
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t = audioCtx.currentTime + i * 0.15;
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.15);
+    });
+}
+
+function playBetSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 800;
+    osc2.type = "sine";
+    osc2.frequency.value = 1600;
+    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+    osc.connect(gain);
+    osc2.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc2.start();
+    osc.stop(audioCtx.currentTime + 0.3);
+    osc2.stop(audioCtx.currentTime + 0.3);
+}
+
+function playAimSound() {
+    if (!audioCtx) return;
+    const bufferSize = Math.floor(audioCtx.sampleRate * 0.02);
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.02);
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+}
+/* ===== FIM SISTEMA DE ÁUDIO =====*/
+
 // Variáveis para o estilingue
 let touchStartX = 0;
 let touchStartY = 0;
@@ -668,36 +812,44 @@ function atualizarFisica() {
     if (branca.x - branca.r < 0) { 
         branca.x = branca.r; 
         velocidadeBranca.x *= -0.7; 
+        playWallSound();
     }
     if (branca.x + branca.r > canvas.width) { 
         branca.x = canvas.width - branca.r; 
         velocidadeBranca.x *= -0.7; 
+        playWallSound();
     }
     if (branca.y - branca.r < 0) { 
         branca.y = branca.r; 
         velocidadeBranca.y *= -0.7; 
+        playWallSound();
     }
     if (branca.y + branca.r > canvas.height) { 
         branca.y = canvas.height - branca.r; 
         velocidadeBranca.y *= -0.7; 
+        playWallSound();
     }
 
     // Colisão com paredes - DOURADA
     if (dourada.x - dourada.r < 0) { 
         dourada.x = dourada.r; 
         velocidadeDourada.x *= -0.7; 
+        playWallSound();
     }
     if (dourada.x + dourada.r > canvas.width) { 
         dourada.x = canvas.width - dourada.r; 
         velocidadeDourada.x *= -0.7; 
+        playWallSound();
     }
     if (dourada.y - dourada.r < 0) { 
         dourada.y = dourada.r; 
         velocidadeDourada.y *= -0.7; 
+        playWallSound();
     }
     if (dourada.y + dourada.r > canvas.height) { 
         dourada.y = canvas.height - dourada.r; 
         velocidadeDourada.y *= -0.7; 
+        playWallSound();
     }
 
     // Colisão entre as bolas
@@ -731,6 +883,7 @@ function atualizarFisica() {
             velocidadeBranca.y -= (v_dot * uy) * 0.9;
             velocidadeDourada.x += (v_dot * ux) * 0.9;
             velocidadeDourada.y += (v_dot * uy) * 0.9;
+            playHitSound(v_dot);
 
             // FÍSICA GUIADA: desvio sutil na colisão quando servidor disse "perdeu"
             if (window.resultadoFinal === false) {
@@ -769,6 +922,7 @@ function atualizarFisica() {
     // Bola dourada entra na caçapa; resultado do servidor determina vitória ou derrota
     if (distHole < hole.r) {
         // Se servidor disse ganhou, vitória! Se não, é fallback (não deveria acontecer)
+        playPocketSound();
         finalizarJogo(window.resultadoFinal ? true : false);
         return;
     }
@@ -800,6 +954,8 @@ canvas.addEventListener("touchstart", (e) => {
     if (!jogoAtivo || bolaMovida) return;
     
     e.preventDefault();
+    initAudio();
+    playAimSound();
     
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
@@ -895,6 +1051,8 @@ let mousePressed = false;
 canvas.addEventListener("mousedown", (e) => {
     if (!jogoAtivo || bolaMovida) return;
     
+    initAudio();
+    playAimSound();
     const rect = canvas.getBoundingClientRect();
     touchStartX = e.clientX - rect.left;
     touchStartY = e.clientY - rect.top;
@@ -1025,6 +1183,7 @@ function gameLoop() {
 
 /* NOVO CONFIRMAR APOSTA (Substitua no HTML) */
 async function confirmBet() {
+    initAudio();
     const btnConfirm = document.getElementById("confirm");
     btnConfirm.disabled = true;
 
@@ -1088,6 +1247,7 @@ async function confirmBet() {
             requestAnimationFrame(gameLoop);
         }
 
+        playBetSound();
         alert("✅ Aposta Confirmada! Boa sorte!");
         
     } catch (e) {
@@ -1106,9 +1266,11 @@ function finalizarJogo(ganhouVisivel) {
 
     if (!ganhouVisivel) {
         // Bola não entrou na caçapa
+        playLoseSound();
         alert("❌ Não foi dessa vez!");
     } else if (ganhouVisivel && window.resultadoFinal) {
         // ✅ Bola entrou E servidor confirmou vitória — PAGAR PRÊMIO
+        playWinSound();
         const ganhoTotal = valorAposta * 3;
         alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
 
@@ -1131,6 +1293,7 @@ function finalizarJogo(ganhouVisivel) {
         });
     } else if (ganhouVisivel && !window.resultadoFinal) {
         // Fallback de segurança — não deveria acontecer com física guiada
+        playLoseSound();
         alert("❌ Não foi dessa vez!");
     }
 
