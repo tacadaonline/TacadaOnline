@@ -354,6 +354,96 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
   }
 
   .btn-fechar-modal:hover { color: #E8D5A3; }
+
+  /* ===== MODAL WIN/LOSS ===== */
+  #modal-resultado {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #modal-resultado.show { display: flex; }
+  .resultado-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border: 2px solid rgba(255,215,0,0.3);
+    border-radius: 20px;
+    padding: 40px 32px;
+    text-align: center;
+    max-width: 320px;
+    width: 90%;
+    animation: resultadoZoomIn 0.35s cubic-bezier(.34,1.56,.64,1);
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  }
+  @keyframes resultadoZoomIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .resultado-icone { font-size: 64px; margin-bottom: 12px; line-height: 1; }
+  .resultado-titulo {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+  }
+  .resultado-subtitulo {
+    font-size: 15px;
+    opacity: 0.75;
+    margin-bottom: 20px;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+    color: #ccc;
+  }
+  .resultado-valor {
+    font-size: 36px;
+    font-weight: 800;
+    color: #FFD700;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+    margin-bottom: 24px;
+    text-shadow: 0 0 20px rgba(255,215,0,0.5);
+  }
+  .resultado-btn {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #1a1a1a;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 40px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 4px 15px rgba(255,165,0,0.4);
+  }
+  .resultado-btn:active { transform: scale(0.97); }
+
+  /* ===== TOAST APOSTA ===== */
+  #toast-bet {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 180, 90, 0.93);
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 30px;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9998;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    animation: toastSlideDown 0.3s ease;
+  }
+  @keyframes toastSlideDown {
+    from { top: -60px; opacity: 0; }
+    to { top: 20px; opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -393,6 +483,20 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
   </div>
 </div>
 
+<!-- Modal Resultado Win/Loss -->
+<div id="modal-resultado">
+  <div class="resultado-box">
+    <div class="resultado-icone" id="resultado-icone">🎉</div>
+    <div class="resultado-titulo" id="resultado-titulo">VITÓRIA!</div>
+    <div class="resultado-subtitulo" id="resultado-subtitulo">Bola na caçapa!</div>
+    <div class="resultado-valor" id="resultado-valor" style="display:none"></div>
+    <button class="resultado-btn" onclick="fecharResultado()">Jogar Novamente</button>
+  </div>
+</div>
+
+<!-- Toast Aposta Confirmada -->
+<div id="toast-bet">✅ Aposta Confirmada! Boa sorte!</div>
+
 <script>
 let usuarioLogado = localStorage.getItem("usuario");
 let valorAposta = 10;
@@ -417,15 +521,19 @@ const CANVAS_BORDER_WIDTH = 6; // canvas CSS border (px), used to sync SVG overl
 let audioCtx = null;
 
 function initAudio() {
-    if (audioCtx) return;
-    try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch(e) { console.log("Audio não suportado"); }
+    if (!audioCtx) {
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { console.log("Audio não suportado"); return; }
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch((err) => { console.warn('Audio resume failed:', err); });
+    }
 }
 
 function playHitSound(velocidade) {
     if (!audioCtx) return;
-    const vol = Math.min(1, Math.abs(velocidade) / 20);
+    const vol = Math.min(Math.max(Math.abs(velocidade) / 8, 0.3), 1.0) * 0.7;
     const bufferSize = Math.floor(audioCtx.sampleRate * 0.08);
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -434,7 +542,7 @@ function playHitSound(velocidade) {
     source.buffer = buffer;
     const filter = audioCtx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+    filter.frequency.setValueAtTime(3500, audioCtx.currentTime);
     filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.08);
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(vol, audioCtx.currentTime);
@@ -476,13 +584,13 @@ function playPocketSound() {
     const gain = audioCtx.createGain();
     osc.type = "sine";
     osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.2);
+    osc.stop(audioCtx.currentTime + 0.35);
 }
 
 function playWinSound() {
@@ -493,14 +601,14 @@ function playWinSound() {
         const gain = audioCtx.createGain();
         osc.type = "sine";
         osc.frequency.value = freq;
-        const t = audioCtx.currentTime + i * 0.1;
+        const t = audioCtx.currentTime + i * 0.15;
         gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.5, t + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        gain.gain.linearRampToValueAtTime(0.6, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(t);
-        osc.stop(t + 0.1);
+        osc.stop(t + 0.25);
     });
 }
 
@@ -531,7 +639,7 @@ function playBetSound() {
     osc.frequency.value = 800;
     osc2.type = "sine";
     osc2.frequency.value = 1600;
-    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.45, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
     osc.connect(gain);
     osc2.connect(gain);
@@ -1250,7 +1358,7 @@ async function confirmBet() {
         }
 
         playBetSound();
-        alert("✅ Aposta Confirmada! Boa sorte!");
+        mostrarToastBet();
         
     } catch (e) {
         alert("❌ Erro de conexão");
@@ -1269,12 +1377,12 @@ function finalizarJogo(ganhouVisivel) {
     if (!ganhouVisivel) {
         // Bola não entrou na caçapa
         playLoseSound();
-        alert("❌ Não foi dessa vez!");
+        mostrarResultado(false);
     } else if (ganhouVisivel && window.resultadoFinal) {
         // ✅ Bola entrou E servidor confirmou vitória — PAGAR PRÊMIO
         playWinSound();
         const ganhoTotal = valorAposta * 3;
-        alert(`🎉 VITÓRIA! Você ganhou R$ ${ganhoTotal.toFixed(2)}`);
+        mostrarResultado(true, ganhoTotal.toFixed(2));
 
         // Chamar endpoint de prêmio para creditar o ganho
         const token = localStorage.getItem("token");
@@ -1296,7 +1404,7 @@ function finalizarJogo(ganhouVisivel) {
     } else if (ganhouVisivel && !window.resultadoFinal) {
         // Fallback de segurança — não deveria acontecer com física guiada
         playLoseSound();
-        alert("❌ Não foi dessa vez!");
+        mostrarResultado(false);
     }
 
     // Cancelar qualquer refetch pendente
@@ -1324,7 +1432,41 @@ function atualizarLucro() {
     document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
 }
 
+function mostrarResultado(ganhou, valor) {
+    const modal = document.getElementById('modal-resultado');
+    const icone = document.getElementById('resultado-icone');
+    const titulo = document.getElementById('resultado-titulo');
+    const subtitulo = document.getElementById('resultado-subtitulo');
+    const valorEl = document.getElementById('resultado-valor');
+    if (ganhou) {
+        icone.textContent = '🎉';
+        titulo.textContent = 'VITÓRIA!';
+        titulo.style.color = '#FFD700';
+        subtitulo.textContent = 'Bola na caçapa!';
+        valorEl.textContent = `+R$ ${valor}`;
+        valorEl.style.display = 'block';
+    } else {
+        icone.textContent = '😢';
+        titulo.textContent = 'Não foi dessa vez!';
+        titulo.style.color = '#ff4444';
+        subtitulo.textContent = 'Tente novamente!';
+        valorEl.style.display = 'none';
+    }
+    modal.classList.add('show');
+}
+
+function fecharResultado() {
+    document.getElementById('modal-resultado').classList.remove('show');
+}
+
+function mostrarToastBet() {
+    const toast = document.getElementById('toast-bet');
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2500);
+}
+
 function selectBet(v, btn) {
+    initAudio();
     valorAposta = v;
     document.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('active-bet'));
     btn.classList.add('active-bet');
@@ -1341,6 +1483,7 @@ function updateCustom(val) {
 }
 
 function abrirModal(tipo) {
+    initAudio();
     const modal = document.getElementById("modalFinanceiro");
     const cont = document.getElementById("conteudo-modal");
     modal.style.display = "flex";
