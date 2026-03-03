@@ -447,8 +447,6 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 </style>
 </head>
 <body>
-<!-- Audio Unlock Overlay — captura QUALQUER primeiro toque/clique na página inteira -->
-<div id="audio-unlock-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:transparent;"></div>
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
@@ -519,48 +517,37 @@ let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 6; // canvas CSS border (px), used to sync SVG overlay coordinates
 
-/* ===== AUTO-UNLOCK ÁUDIO + INÍCIO DA MÚSICA ===== */
-let _audioUnlocked = false;
+/* ===== DESBLOQUEIO DE ÁUDIO NO PRIMEIRO GESTO ===== */
+let _musicStarted = false;
 
-function forceUnlockAudio() {
-    if (_audioUnlocked) return;
-    _audioUnlocked = true;
-    
-    // Remover overlay
-    const overlay = document.getElementById('audio-unlock-overlay');
-    if (overlay) overlay.remove();
-    
-    // Inicializar áudio e começar música
-    initAudio();
+function _startMusicOnGesture() {
+    if (_musicStarted) return;
+    _musicStarted = true;
+
+    // Criar AudioContext no gesto do usuário (obrigatório em mobile)
+    if (!audioCtx) {
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { console.log("Audio não suportado"); return; }
+    }
+
+    // Resume é assíncrono — esperar COMPLETAR antes de tocar
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(function() {
+            playBackgroundMusic();
+        }).catch(function(err) {
+            console.warn('Audio resume failed:', err);
+        });
+    } else {
+        playBackgroundMusic();
+    }
 }
 
-// Capturar primeiro toque em QUALQUER lugar da página
-document.addEventListener('touchstart', function() {
-    forceUnlockAudio();
-}, { once: true, passive: true });
-
-document.addEventListener('mousedown', function() {
-    forceUnlockAudio();
-}, { once: true });
-
-document.addEventListener('click', function() {
-    forceUnlockAudio();
-}, { once: true });
-
-// O overlay também captura toques
-window.addEventListener('load', function() {
-    const overlay = document.getElementById('audio-unlock-overlay');
-    if (overlay) {
-        overlay.addEventListener('touchstart', function(e) {
-            forceUnlockAudio();
-            // Permitir que o toque passe para elementos abaixo
-        }, { once: true, passive: true });
-        overlay.addEventListener('click', function() {
-            forceUnlockAudio();
-        }, { once: true });
-    }
+// Usar captura (3o argumento true) para pegar o evento ANTES do touch-action: none cancelar
+['touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(function(evt) {
+    document.addEventListener(evt, _startMusicOnGesture, { once: true, capture: true, passive: true });
 });
-/* ===== FIM AUTO-UNLOCK ===== */
+/* ===== FIM DESBLOQUEIO ===== */
 
 /* ===== SISTEMA DE ÁUDIO =====*/
 let audioCtx = null;
@@ -572,10 +559,8 @@ function initAudio() {
         } catch(e) { console.log("Audio não suportado"); return; }
     }
     if (audioCtx.state === 'suspended') {
-        audioCtx.resume().catch((err) => { console.warn('Audio resume failed:', err); });
+        audioCtx.resume().catch(function(err) { console.warn('Audio resume failed:', err); });
     }
-    // Iniciar música de fundo na primeira interação
-    playBackgroundMusic();
 }
 
 function playHitSound(velocidade) {
