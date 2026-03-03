@@ -529,6 +529,8 @@ function initAudio() {
     if (audioCtx.state === 'suspended') {
         audioCtx.resume().catch((err) => { console.warn('Audio resume failed:', err); });
     }
+    // Iniciar música de fundo na primeira interação
+    playBackgroundMusic();
 }
 
 function playHitSound(velocidade) {
@@ -664,6 +666,119 @@ function playAimSound() {
     source.connect(gain);
     gain.connect(audioCtx.destination);
     source.start();
+}
+
+/* ===== MÚSICA DE FUNDO AMBIENTE ===== */
+let bgMusicPlaying = false;
+let bgMusicNodes = [];
+let bgMusicTimeout = null;
+
+function playBackgroundMusic() {
+    if (bgMusicPlaying || !audioCtx) return;
+    bgMusicPlaying = true;
+
+    // Master gain para toda a música de fundo
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.12; // Volume baixo para não atrapalhar efeitos
+    masterGain.connect(audioCtx.destination);
+    bgMusicNodes.push(masterGain);
+
+    // === PAD ATMOSFÉRICO (acorde menor) ===
+    // Notas: C3, Eb3, G3, Bb3 — acorde Cm7 suave
+    const padFreqs = [130.81, 155.56, 196.00, 233.08];
+    padFreqs.forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.06;
+
+        // Tremolo sutil para sensação "viva"
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.3 + Math.random() * 0.2; // 0.3-0.5 Hz
+        lfoGain.gain.value = 0.015; // Variação muito sutil
+        lfo.connect(lfoGain);
+        lfoGain.connect(gain.gain);
+        lfo.start();
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        bgMusicNodes.push(osc, gain, lfo, lfoGain);
+    });
+
+    // === BAIXO PULSANTE (dopamina/urgência) ===
+    // Nota grave C2 pulsando ritmicamente
+    const bassOsc = audioCtx.createOscillator();
+    bassOsc.type = 'sine';
+    bassOsc.frequency.value = 65.41; // C2
+
+    const bassGain = audioCtx.createGain();
+    bassGain.gain.value = 0;
+
+    // LFO para pulsar o baixo (batida cardíaca artificial)
+    const bassLfo = audioCtx.createOscillator();
+    const bassLfoGain = audioCtx.createGain();
+    bassLfo.type = 'sine';
+    bassLfo.frequency.value = 0.667; // ~80 BPM (batimento cardíaco)
+    bassLfoGain.gain.value = 0.05;
+    bassLfo.connect(bassLfoGain);
+    bassLfoGain.connect(bassGain.gain);
+    bassLfo.start();
+
+    bassOsc.connect(bassGain);
+    bassGain.connect(masterGain);
+    bassOsc.start();
+    bgMusicNodes.push(bassOsc, bassGain, bassLfo, bassLfoGain);
+
+    // === NOTAS MELÓDICAS ALEATÓRIAS (pentatônica menor) ===
+    // C, Eb, F, G, Bb em diferentes oitavas — estilo jazz lounge
+    const pentatonic = [261.63, 311.13, 349.23, 392.00, 466.16, 523.25, 622.25, 698.46];
+
+    function playRandomNote() {
+        if (!bgMusicPlaying || !audioCtx) return;
+
+        const freq = pentatonic[Math.floor(Math.random() * pentatonic.length)];
+        const osc = audioCtx.createOscillator();
+        osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+
+        const noteGain = audioCtx.createGain();
+        const now = audioCtx.currentTime;
+        const duration = 1.5 + Math.random() * 2; // 1.5-3.5 segundos
+
+        noteGain.gain.setValueAtTime(0, now);
+        noteGain.gain.linearRampToValueAtTime(0.04, now + 0.1); // Fade in suave
+        noteGain.gain.exponentialRampToValueAtTime(0.001, now + duration); // Fade out longo
+
+        osc.connect(noteGain);
+        noteGain.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + duration);
+        bgMusicNodes.push(osc, noteGain);
+
+        // Próxima nota aleatória entre 2-5 segundos
+        const nextDelay = 2000 + Math.random() * 3000;
+        bgMusicTimeout = setTimeout(playRandomNote, nextDelay);
+    }
+
+    // Iniciar notas melódicas após 2 segundos
+    bgMusicTimeout = setTimeout(playRandomNote, 2000);
+}
+
+function stopBackgroundMusic() {
+    bgMusicPlaying = false;
+    if (bgMusicTimeout !== null) { clearTimeout(bgMusicTimeout); bgMusicTimeout = null; }
+    bgMusicNodes.forEach(node => {
+        try {
+            if (node.stop) node.stop();
+            node.disconnect();
+        } catch(e) {}
+    });
+    bgMusicNodes = [];
 }
 /* ===== FIM SISTEMA DE ÁUDIO =====*/
 
