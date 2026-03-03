@@ -447,8 +447,8 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 </style>
 </head>
 <body>
-<!-- Audio Unlock Overlay — captura primeiro toque para desbloquear AudioContext -->
-<div id="audio-unlock" style="position:fixed;inset:0;z-index:99999;background:transparent;cursor:pointer;" onclick="unlockAndStartMusic()"></div>
+<!-- Audio Unlock Overlay — captura QUALQUER primeiro toque/clique na página inteira -->
+<div id="audio-unlock-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:transparent;"></div>
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
@@ -519,31 +519,48 @@ let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 6; // canvas CSS border (px), used to sync SVG overlay coordinates
 
-/* ===== AUTO-START MÚSICA DE FUNDO ===== */
-function unlockAndStartMusic() {
-    const overlay = document.getElementById('audio-unlock');
+/* ===== AUTO-UNLOCK ÁUDIO + INÍCIO DA MÚSICA ===== */
+let _audioUnlocked = false;
+
+function forceUnlockAudio() {
+    if (_audioUnlocked) return;
+    _audioUnlocked = true;
+    
+    // Remover overlay
+    const overlay = document.getElementById('audio-unlock-overlay');
     if (overlay) overlay.remove();
+    
+    // Inicializar áudio e começar música
     initAudio();
-    // playBackgroundMusic() já é chamado dentro de initAudio()
 }
 
-// Fallback: também tentar desbloquear via touchstart/mousedown no document
-document.addEventListener('touchstart', function _unlock() {
-    unlockAndStartMusic();
-    document.removeEventListener('touchstart', _unlock);
+// Capturar primeiro toque em QUALQUER lugar da página
+document.addEventListener('touchstart', function() {
+    forceUnlockAudio();
+}, { once: true, passive: true });
+
+document.addEventListener('mousedown', function() {
+    forceUnlockAudio();
 }, { once: true });
 
-document.addEventListener('mousedown', function _unlock() {
-    unlockAndStartMusic();
-    document.removeEventListener('mousedown', _unlock);
+document.addEventListener('click', function() {
+    forceUnlockAudio();
 }, { once: true });
 
-// Tentar autoplay agressivo no window.onload (funciona em alguns browsers desktop)
+// O overlay também captura toques
 window.addEventListener('load', function() {
-    setTimeout(() => {
-        initAudio();
-    }, 500);
+    const overlay = document.getElementById('audio-unlock-overlay');
+    if (overlay) {
+        overlay.addEventListener('touchstart', function(e) {
+            forceUnlockAudio();
+            // Permitir que o toque passe para elementos abaixo
+        }, { once: true, passive: true });
+        overlay.addEventListener('click', function() {
+            forceUnlockAudio();
+        }, { once: true });
+    }
 });
+/* ===== FIM AUTO-UNLOCK ===== */
 
 /* ===== SISTEMA DE ÁUDIO =====*/
 let audioCtx = null;
