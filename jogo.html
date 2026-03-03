@@ -418,7 +418,9 @@ let audioCtx = null;
 
 function initAudio() {
     if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { console.log("Audio não suportado"); }
 }
 
 function playHitSound(velocidade) {
