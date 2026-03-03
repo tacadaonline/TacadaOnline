@@ -319,7 +319,7 @@ app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
         { new: false }
     );
     if (!user || !user.premioValor) return res.status(400).json({ success: false, message: "Token inválido" });
-    const premio = user.premioValor * 3;
+    const premio = user.premioValor * 10;
     const atualizado = await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: premio }, $set: { premioValor: null } }, { new: true });
     res.json({ success: true, saldo: atualizado.saldo });
 });

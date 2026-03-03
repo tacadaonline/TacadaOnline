@@ -447,10 +447,12 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 </style>
 </head>
 <body>
+<!-- Audio Unlock Overlay — captura primeiro toque para desbloquear AudioContext -->
+<div id="audio-unlock" style="position:fixed;inset:0;z-index:99999;background:transparent;cursor:pointer;" onclick="unlockAndStartMusic()"></div>
 
 <div class="header">
   <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
-  <div class="stat-box"><span class="stat-label">Retorno (3.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 30.00</span></div>
+  <div class="stat-box"><span class="stat-label">Retorno (10.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 100.00</span></div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">3.50</span></div>
 </div>
 
@@ -516,6 +518,32 @@ let tempoMaximo = 3.50;
 let timerAtivo = false;
 
 const CANVAS_BORDER_WIDTH = 6; // canvas CSS border (px), used to sync SVG overlay coordinates
+
+/* ===== AUTO-START MÚSICA DE FUNDO ===== */
+function unlockAndStartMusic() {
+    const overlay = document.getElementById('audio-unlock');
+    if (overlay) overlay.remove();
+    initAudio();
+    // playBackgroundMusic() já é chamado dentro de initAudio()
+}
+
+// Fallback: também tentar desbloquear via touchstart/mousedown no document
+document.addEventListener('touchstart', function _unlock() {
+    unlockAndStartMusic();
+    document.removeEventListener('touchstart', _unlock);
+}, { once: true });
+
+document.addEventListener('mousedown', function _unlock() {
+    unlockAndStartMusic();
+    document.removeEventListener('mousedown', _unlock);
+}, { once: true });
+
+// Tentar autoplay agressivo no window.onload (funciona em alguns browsers desktop)
+window.addEventListener('load', function() {
+    setTimeout(() => {
+        initAudio();
+    }, 500);
+});
 
 /* ===== SISTEMA DE ÁUDIO =====*/
 let audioCtx = null;
@@ -1496,7 +1524,7 @@ function finalizarJogo(ganhouVisivel) {
     } else if (ganhouVisivel && window.resultadoFinal) {
         // ✅ Bola entrou E servidor confirmou vitória — PAGAR PRÊMIO
         playWinSound();
-        const ganhoTotal = valorAposta * 3;
+        const ganhoTotal = valorAposta * 10;
         mostrarResultado(true, ganhoTotal.toFixed(2));
 
         // Chamar endpoint de prêmio para creditar o ganho
@@ -1544,7 +1572,7 @@ function finalizarJogo(ganhouVisivel) {
 }
 
 function atualizarLucro() {
-    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 3).toFixed(2)}`;
+    document.getElementById("lucro").innerText = `R$ ${(valorAposta * 10).toFixed(2)}`;
 }
 
 function mostrarResultado(ganhou, valor) {
