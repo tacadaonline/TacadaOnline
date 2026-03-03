@@ -521,14 +521,14 @@
         <section class="hero">
             <div class="badge-exclusive">⚜ Clube Exclusivo</div>
             <h1>A mesa está pronta.<br>A vaga é sua.</h1>
-            <p class="hero-sub">Crie sua conta e entre em campo agora</p>
+            <p class="hero-sub">Cadastre-se e entre direto no jogo</p>
         </section>
 
         <!-- Step indicator -->
         <div class="step-indicator">
             <div class="step-dot active"></div>
             <div class="step-dot"></div>
-            <span class="step-label">Passo 1 de 2</span>
+            <span class="step-label">Cadastro Rápido</span>
         </div>
 
         <!-- Form card -->
@@ -556,7 +556,7 @@
                 </div>
             </div>
 
-            <button class="btn-cad" id="btnCadastrar" onclick="cadastrar()">⚜ FINALIZAR CADASTRO</button>
+            <button class="btn-cad" id="btnCadastrar" onclick="cadastrar()">⚜ CADASTRAR E JOGAR</button>
 
             <div id="erro"></div>
 
@@ -617,7 +617,7 @@
             }
 
             btn.disabled = true;
-            btn.innerText = "PROCESSANDO...";
+            btn.innerText = "ENTRANDO NO JOGO...";
             erroEl.innerText = "";
 
             try {
@@ -632,18 +632,39 @@
                 
                 if (data.success) {
                     fbq('track', 'CompleteRegistration');
-                    alert("✅ Cadastro realizado com sucesso! Faça seu login.");
-                    window.location.href = "index.html"; 
+
+                    // Login automático com as mesmas credenciais
+                    try {
+                        const loginRes = await fetch("/api/login", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ username: user, password: pass })
+                        });
+                        const loginData = await loginRes.json();
+
+                        if (loginData.success) {
+                            localStorage.setItem("usuario", loginData.username);
+                            localStorage.setItem("token", loginData.token);
+                            window.location.href = "jogo.html";
+                            return;
+                        }
+                    } catch(loginErr) {
+                        console.log("Auto-login falhou, redirecionando para login manual");
+                    }
+
+                    // Fallback: se o auto-login falhar, redirecionar para login manual
+                    alert("✅ Cadastro realizado! Faça seu login.");
+                    window.location.href = "index.html";
                 } else {
                     erroEl.innerText = data.message || data.msg || "Usuário já existe.";
                     btn.disabled = false;
-                    btn.innerText = "⚜ FINALIZAR CADASTRO";
+                    btn.innerText = "⚜ CADASTRAR E JOGAR";
                 }
             } catch (err) {
                 console.error("Erro no cadastro:", err);
                 erroEl.innerText = "Erro de conexão. Verifique o servidor.";
                 btn.disabled = false;
-                btn.innerText = "⚜ FINALIZAR CADASTRO";
+                btn.innerText = "⚜ CADASTRAR E JOGAR";
             }
         }
 
