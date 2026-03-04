@@ -709,7 +709,7 @@ function playBackgroundMusic() {
 
     // Master gain para toda a música de fundo
     const masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.12; // Volume baixo para não atrapalhar efeitos
+    masterGain.gain.value = 0.15; // Volume baixo para não atrapalhar efeitos
     masterGain.connect(audioCtx.destination);
     bgMusicNodes.push(masterGain);
 
