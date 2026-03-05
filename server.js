@@ -17,6 +17,14 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 app.use(express.json());
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+});
 app.use(express.static(path.join(__dirname, "public")));
 
 // --- CONFIGURAÇÃO DO AGENTE FIXIE ---
@@ -119,11 +127,23 @@ const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const pixLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 const callbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
+const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 
 // --- SANITIZAR ---
 function sanitizar(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// --- VERIFICAR SENHA ADMIN (timing-safe) ---
+function verificarSenhaAdmin(input) {
+    if (!input || typeof input !== 'string') return false;
+    const a = Buffer.from(input);
+    const b = Buffer.from(ADMIN_PASSWORD_FIXA);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
 }
 
 // --- MIDDLEWARE: AUTENTICAR JWT ---
@@ -144,11 +164,16 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
     const { valor, cpf, email } = req.body;
     const username = req.usuario.username;
 
+    if (typeof valor !== 'number' || isNaN(valor) || !isFinite(valor) || valor < 1 || valor > 50000) {
+        return res.status(400).json({ success: false, message: "Valor inválido para depósito" });
+    }
+    const valorPix = Math.round(valor * 100) / 100;
+
     try {
         const accessToken = await obterTokenBspay();
         const externalId = crypto.randomBytes(12).toString('hex');
         const payload = {
-            amount: parseFloat(valor),
+            amount: valorPix,
             external_id: externalId,
             payerQuestion: "Deposito no Jogo",
             payer: {
@@ -177,10 +202,10 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
         await new Deposito({
             external_id: externalId,
             username: username,
-            valor: parseFloat(valor),
+            valor: valorPix,
             status: "pendente"
         }).save();
-        console.log(`💾 Depósito pendente salvo: ${externalId} para ${username} R$ ${parseFloat(valor).toFixed(2)}`);
+        console.log(`💾 Depósito pendente salvo: ${externalId} para ${username} R$ ${valorPix.toFixed(2)}`);
 
         const dados = response.data;
 
@@ -268,17 +293,39 @@ app.post("/api/callback-pix", async (req, res) => {
 app.post("/api/register", async (req, res) => {
     try {
         const { username, password, ref } = req.body;
+
+        if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
+            return res.status(400).json({ success: false, message: "Dados inválidos" });
+        }
+
+        const cleanUsername = username.trim().toLowerCase();
+
+        if (!/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(cleanUsername)) {
+            return res.status(400).json({ success: false, message: "Usuário inválido. Use apenas letras, números, _ ou -. Mínimo 3, máximo 30 caracteres." });
+        }
+
+        if (password.length < 3 || password.length > 128) {
+            return res.status(400).json({ success: false, message: "Senha inválida" });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const novo = new User({ username: username.trim().toLowerCase(), password: hashedPassword, indicadoPor: ref || null });
+        const cleanRef = ref ? sanitizar(ref.trim().toLowerCase()) : null;
+        const novo = new User({ username: cleanUsername, password: hashedPassword, indicadoPor: cleanRef });
         await novo.save();
         res.json({ success: true });
-    } catch (err) { res.status(400).json({ success: false }); }
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(400).json({ success: false, message: "Usuário já existe" });
+        }
+        res.status(400).json({ success: false, message: "Erro no cadastro" });
+    }
 });
 
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", loginLimiter, async (req, res) => {
     const { username, password } = req.body;
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
+    const cleanUsername = username?.trim()?.toLowerCase() || '';
+    const user = await User.findOne({ username: cleanUsername });
     if (user && await bcrypt.compare(password, user.password)) {
         const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '24h' });
         return res.json({ success: true, username: user.username, saldo: user.saldo, token });
@@ -289,23 +336,24 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
     const { valor } = req.body;
     const username = req.usuario.username;
-    if (!username || typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
+    if (!username || typeof valor !== 'number' || isNaN(valor) || !isFinite(valor) || valor <= 0 || valor > 10000) {
         return res.status(400).json({ success: false, message: "Dados inválidos" });
     }
+    const valorAposta = Math.round(valor * 100) / 100;
     const ganhou = Math.random() < globalRTP;
     const atualizado = await User.findOneAndUpdate(
-        { username: username.trim().toLowerCase(), saldo: { $gte: valor } },
-        { $inc: { saldo: -valor } },
+        { username: username.trim().toLowerCase(), saldo: { $gte: valorAposta } },
+        { $inc: { saldo: -valorAposta } },
         { new: true }
     );
     if (!atualizado) return res.status(400).json({ success: false, message: "Saldo insuficiente" });
     if (!ganhou && atualizado.indicadoPor) {
-        await User.findOneAndUpdate({ username: atualizado.indicadoPor }, { $inc: { comissao: valor * 0.10 } });
+        await User.findOneAndUpdate({ username: atualizado.indicadoPor }, { $inc: { comissao: valorAposta * 0.10 } });
     }
     let premioToken = null;
     if (ganhou) {
         premioToken = crypto.randomBytes(32).toString('hex');
-        await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $set: { premioToken: premioToken, premioValor: valor } });
+        await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $set: { premioToken: premioToken, premioValor: valorAposta } });
     }
     res.json({ success: true, saldo: atualizado.saldo, ganhou, premioToken });
 });
@@ -330,42 +378,65 @@ app.get("/api/saldo", autenticar, async (req, res) => {
     res.json({ success: true, saldo: user.saldo });
 });
 
-app.post("/api/solicitar-saque", autenticar, async (req, res) => {
+app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
     const { valor, pix } = req.body;
     const username = req.usuario.username;
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
-    if (!user || user.saldo < valor) return res.status(400).json({ success: false });
-    await User.findOneAndUpdate({ username: user.username }, { $inc: { saldo: -valor } });
-    await new Saque({ username: user.username, valor, chavePix: pix }).save();
-    res.json({ success: true });
+
+    if (typeof valor !== 'number' || isNaN(valor) || !isFinite(valor) || valor < 1 || valor > 50000) {
+        return res.status(400).json({ success: false, message: "Valor de saque inválido" });
+    }
+    if (!pix || typeof pix !== 'string' || pix.trim().length < 5 || pix.trim().length > 300) {
+        return res.status(400).json({ success: false, message: "Chave PIX inválida" });
+    }
+
+    const valorSaque = Math.round(valor * 100) / 100;
+    const chavePix = sanitizar(pix.trim());
+
+    const atualizado = await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase(), saldo: { $gte: valorSaque } },
+        { $inc: { saldo: -valorSaque } },
+        { new: true }
+    );
+    if (!atualizado) return res.status(400).json({ success: false, message: "Saldo insuficiente" });
+
+    await new Saque({ username: atualizado.username, valor: valorSaque, chavePix: chavePix }).save();
+    res.json({ success: true, saldo: atualizado.saldo });
 });
 
-app.post("/admin/usuarios", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+app.post("/admin/usuarios", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
     res.json({ success: true, usuarios: users });
 });
 
-app.post("/admin/saques-pendentes", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+app.post("/admin/saques-pendentes", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     const saques = await Saque.find({ status: "pendente" });
     res.json({ success: true, saques });
 });
 
-app.post("/admin/set-rtp", (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    globalRTP = parseFloat(req.body.rtp);
+app.post("/admin/set-rtp", adminLimiter, (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const rtp = parseFloat(req.body.rtp);
+    if (isNaN(rtp) || !isFinite(rtp) || rtp < 0 || rtp > 1) {
+        return res.status(400).json({ success: false, message: "RTP deve ser entre 0 e 1" });
+    }
+    globalRTP = rtp;
     res.json({ success: true });
 });
 
-app.post("/admin/get-rtp", (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
+app.post("/admin/get-rtp", adminLimiter, (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     res.json({ success: true, rtp: globalRTP });
 });
 
-app.post("/admin/add-saldo", async (req, res) => {
-    if (req.body.senha !== ADMIN_PASSWORD_FIXA) return res.status(403).json({ success: false });
-    await User.findOneAndUpdate({ username: req.body.username }, { $inc: { saldo: parseFloat(req.body.valor) } });
+app.post("/admin/add-saldo", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const { username, valor } = req.body;
+    if (!username || typeof username !== 'string') return res.status(400).json({ success: false, message: "Usuário inválido" });
+    const valorAdd = parseFloat(valor);
+    if (isNaN(valorAdd) || !isFinite(valorAdd)) return res.status(400).json({ success: false, message: "Valor inválido" });
+    await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: valorAdd } });
     res.json({ success: true });
 });
 
