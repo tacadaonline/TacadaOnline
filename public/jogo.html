@@ -77,8 +77,8 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100dvh;
     height: 100vh; /* fallback para browsers sem dvh */
+    height: 100dvh;
     overflow: hidden;
     position: relative;
   }
@@ -224,7 +224,6 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
   .bet-btn {
     width: 52px;
     height: var(--btn-height);
-    min-height: var(--touch-min);
     border-radius: 50%;
     background: rgba(14, 14, 22, 0.88);
     backdrop-filter: blur(12px);
