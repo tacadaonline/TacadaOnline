@@ -1443,7 +1443,6 @@ async function atualizarSaldoDoServidor(retries = 3, forceUpdate = false) {
         // ✅ Validar se usuário está autenticado
         const token = localStorage.getItem("token");
         if (!token) {
-            console.log("❌ Usuário não autenticado");
             _fetchingSaldo = false;
             return;
         }
@@ -1459,14 +1458,12 @@ async function atualizarSaldoDoServidor(retries = 3, forceUpdate = false) {
                 localStorage.setItem("affiliateLink", data.affiliateLink);
             }
         } else {
-            console.log("❌ Erro ao buscar saldo:", data.error);
             if (retries > 0) {
                 setTimeout(() => { _fetchingSaldo = false; atualizarSaldoDoServidor(retries - 1, forceUpdate); }, 1000);
                 return;
             }
         }
     } catch (e) {
-        console.log("❌ Erro de conexão ao buscar saldo:", e);
         if (retries > 0) {
             setTimeout(() => { _fetchingSaldo = false; atualizarSaldoDoServidor(retries - 1, forceUpdate); }, 1000);
             return;
@@ -1590,7 +1587,6 @@ function finalizarJogo(ganhouVisivel) {
             }
         })
         .catch(e => {
-            console.log("Erro ao receber prêmio:", e);
             alert("⚠️ Erro ao creditar prêmio. Entre em contato com o suporte.");
         });
     } else if (ganhouVisivel && !window.resultadoFinal) {
@@ -1770,7 +1766,6 @@ async function gerarPix() {
             document.getElementById("qR").innerHTML = `<p style='color:#ff4444'>❌ ${data.message || "Erro ao gerar PIX"}</p>`;
         }
     } catch(e) {
-        console.error("Erro ao gerar PIX:", e);
         document.getElementById("qR").innerHTML = "<p style='color:#ff4444'>❌ Erro de conexão com o servidor.</p>";
     }
 }
@@ -1796,7 +1791,6 @@ async function fazerSaque() {
             alert("❌ " + (data.message || "Erro ao solicitar saque. Saldo insuficiente?"));
         }
     } catch(e) {
-        console.log("Erro ao solicitar saque:", e);
         alert("❌ Erro de conexão. Tente novamente.");
     }
 }
@@ -1825,6 +1819,13 @@ document.addEventListener('contextmenu', function(e) {
 });
 
 async function abrirPainelAfiliado() {
+    // Verificar autenticação antes de abrir o modal
+    const token = localStorage.getItem("token");
+    if (!token || !usuarioLogado) {
+        alert("Faça login para acessar o painel de afiliados");
+        return;
+    }
+
     // Fallback: carregar do localStorage imediatamente
     _affiliateLink = localStorage.getItem("affiliateLink") || _affiliateLink || null;
 
@@ -1847,15 +1848,6 @@ async function abrirPainelAfiliado() {
     
     // Buscar dados do afiliado do servidor
     try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            if (!_affiliateLink) linkInput.value = 'Faça login novamente';
-            document.getElementById("aff-total-amigos").textContent = '0';
-            document.getElementById("aff-comissao").textContent = 'R$ 0.00';
-            document.getElementById("aff-total-sacado").textContent = 'R$ 0.00';
-            return;
-        }
-
         const res = await fetch("/api/affiliate-stats", {
             headers: { "Authorization": "Bearer " + token }
         });
@@ -1905,7 +1897,6 @@ async function abrirPainelAfiliado() {
         document.getElementById("aff-comissao").textContent = 'R$ 0.00';
         document.getElementById("aff-total-sacado").textContent = 'R$ 0.00';
     } catch (err) {
-        console.error("Erro ao buscar dados de afiliado:", err);
         // Último recurso: usar localStorage
         const stored = localStorage.getItem("affiliateLink");
         if (stored) {
@@ -1925,6 +1916,13 @@ function fecharPainelAfiliado() {
 }
 
 async function converterComissao() {
+    // Verificar autenticação
+    const token = localStorage.getItem("token");
+    if (!token || !usuarioLogado) {
+        alert("Faça login para converter comissão");
+        return;
+    }
+
     // Verificar se há comissão para converter
     const comissaoEl = document.getElementById("aff-comissao");
     const comissaoText = comissaoEl ? comissaoEl.textContent.replace(/R\$/g, '').trim() : '0';
@@ -1939,7 +1937,6 @@ async function converterComissao() {
     btn.textContent = "Convertendo...";
     
     try {
-        const token = localStorage.getItem("token");
         const res = await fetch("/api/affiliate-withdraw", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }
