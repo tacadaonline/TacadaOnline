@@ -497,6 +497,43 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 <!-- Toast Aposta Confirmada -->
 <div id="toast-bet">✅ Aposta Confirmada! Boa sorte!</div>
 
+<!-- Modal Afiliado -->
+<div id="modalAfiliado" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#121212; border-radius:16px; padding:24px; max-width:400px; width:100%; max-height:90vh; overflow-y:auto; border:1px solid rgba(198,162,66,0.3); position:relative;">
+    <button onclick="fecharPainelAfiliado()" style="position:absolute; top:12px; right:16px; background:none; border:none; color:#aaa; font-size:22px; cursor:pointer;">✕</button>
+    
+    <h2 style="color:#C6A242; font-size:20px; margin-bottom:4px; text-align:center;">🤝 Programa de Afiliado</h2>
+    <p style="color:#888; font-size:12px; text-align:center; margin-bottom:20px;">Ganhe 10% do primeiro depósito de cada amigo!</p>
+    
+    <!-- Link de Convite -->
+    <div style="margin-bottom:20px;">
+      <label style="color:#aaa; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Seu Link de Convite</label>
+      <input type="text" id="affiliateLinkInput" readonly style="width:100%; padding:12px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:#C6A242; font-size:13px; margin-top:6px; cursor:pointer;" onclick="this.select()">
+      <button onclick="copiarLinkAfiliado()" style="width:100%; padding:12px; background:#C6A242; color:#121212; border:none; font-weight:bold; border-radius:8px; margin-top:8px; font-size:14px; cursor:pointer;">📋 Copiar Link</button>
+    </div>
+    
+    <!-- Cards de Status -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Amigos</div>
+        <div id="aff-total-amigos" style="color:#C6A242; font-size:20px; font-weight:bold;">0</div>
+      </div>
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Comissão</div>
+        <div id="aff-comissao" style="color:#00e676; font-size:20px; font-weight:bold;">R$ 0</div>
+      </div>
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Já Sacado</div>
+        <div id="aff-total-sacado" style="color:#aaa; font-size:20px; font-weight:bold;">R$ 0</div>
+      </div>
+    </div>
+    
+    <!-- Botão Converter -->
+    <button id="btn-converter-comissao" onclick="converterComissao()" style="width:100%; padding:14px; background:linear-gradient(135deg,#C6A242,#E8C860); color:#121212; border:none; font-weight:bold; border-radius:10px; font-size:15px; cursor:pointer; box-shadow:0 4px 15px rgba(198,162,66,0.3);">💰 Converter em Saldo</button>
+    <p style="color:#555; font-size:10px; text-align:center; margin-top:8px;">A comissão será adicionada ao seu saldo de jogo</p>
+  </div>
+</div>
+
 <script>
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -1788,6 +1825,9 @@ document.addEventListener('contextmenu', function(e) {
 });
 
 async function abrirPainelAfiliado() {
+    // Fallback: carregar do localStorage imediatamente
+    _affiliateLink = localStorage.getItem("affiliateLink") || _affiliateLink || null;
+
     const modal = document.getElementById("modalAfiliado");
     modal.style.display = "flex";
     
@@ -1799,12 +1839,20 @@ async function abrirPainelAfiliado() {
     } else {
         linkInput.value = 'Carregando...';
     }
+
+    // Mostrar loading nos cards enquanto busca
+    document.getElementById("aff-total-amigos").textContent = '...';
+    document.getElementById("aff-comissao").textContent = '...';
+    document.getElementById("aff-total-sacado").textContent = '...';
     
     // Buscar dados do afiliado do servidor
     try {
         const token = localStorage.getItem("token");
         if (!token) {
             if (!_affiliateLink) linkInput.value = 'Faça login novamente';
+            document.getElementById("aff-total-amigos").textContent = '0';
+            document.getElementById("aff-comissao").textContent = 'R$ 0.00';
+            document.getElementById("aff-total-sacado").textContent = 'R$ 0.00';
             return;
         }
 
@@ -1816,8 +1864,22 @@ async function abrirPainelAfiliado() {
             const data = await res.json();
             if (data.success) {
                 document.getElementById("aff-total-amigos").textContent = data.totalAmigos || 0;
-                document.getElementById("aff-comissao").textContent = "R$ " + (data.comissao || 0).toFixed(2);
+                const comissao = data.comissao || 0;
+                document.getElementById("aff-comissao").textContent = "R$ " + comissao.toFixed(2);
                 document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
+                // Habilitar/desabilitar botão de conversão conforme comissão
+                const btnConverter = document.getElementById("btn-converter-comissao");
+                if (comissao <= 0) {
+                    btnConverter.disabled = true;
+                    btnConverter.style.background = '#555';
+                    btnConverter.style.cursor = 'not-allowed';
+                    btnConverter.style.boxShadow = 'none';
+                } else {
+                    btnConverter.disabled = false;
+                    btnConverter.style.background = 'linear-gradient(135deg,#C6A242,#E8C860)';
+                    btnConverter.style.cursor = 'pointer';
+                    btnConverter.style.boxShadow = '0 4px 15px rgba(198,162,66,0.3)';
+                }
                 if (data.affiliateLink) {
                     _affiliateLink = data.affiliateLink;
                     localStorage.setItem("affiliateLink", data.affiliateLink);
@@ -1839,6 +1901,9 @@ async function abrirPainelAfiliado() {
                 linkInput.value = baseUrl + '?ref=' + saldoData.affiliateLink;
             }
         }
+        document.getElementById("aff-total-amigos").textContent = '0';
+        document.getElementById("aff-comissao").textContent = 'R$ 0.00';
+        document.getElementById("aff-total-sacado").textContent = 'R$ 0.00';
     } catch (err) {
         console.error("Erro ao buscar dados de afiliado:", err);
         // Último recurso: usar localStorage
@@ -1846,9 +1911,12 @@ async function abrirPainelAfiliado() {
         if (stored) {
             _affiliateLink = stored;
             linkInput.value = baseUrl + '?ref=' + stored;
-        } else if (!_affiliateLink) {
+        } else {
             linkInput.value = 'Erro ao carregar. Tente novamente.';
         }
+        document.getElementById("aff-total-amigos").textContent = '0';
+        document.getElementById("aff-comissao").textContent = 'R$ 0.00';
+        document.getElementById("aff-total-sacado").textContent = 'R$ 0.00';
     }
 }
 
@@ -1857,6 +1925,15 @@ function fecharPainelAfiliado() {
 }
 
 async function converterComissao() {
+    // Verificar se há comissão para converter
+    const comissaoEl = document.getElementById("aff-comissao");
+    const comissaoText = comissaoEl ? comissaoEl.textContent.replace(/R\$/g, '').trim() : '0';
+    const comissaoVal = parseFloat(comissaoText) || 0;
+    if (comissaoVal <= 0) {
+        alert("Você não tem comissão para converter");
+        return;
+    }
+
     const btn = document.getElementById("btn-converter-comissao");
     btn.disabled = true;
     btn.textContent = "Convertendo...";
@@ -1873,14 +1950,24 @@ async function converterComissao() {
             setSaldo(data.novoSaldo);
             document.getElementById("aff-comissao").textContent = "R$ 0.00";
             document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
+            btn.style.background = '#555';
+            btn.style.cursor = 'not-allowed';
+            btn.style.boxShadow = 'none';
         } else {
             alert("❌ " + (data.message || "Erro ao converter comissão"));
+            btn.disabled = false;
+            btn.style.background = 'linear-gradient(135deg,#C6A242,#E8C860)';
+            btn.style.cursor = 'pointer';
+            btn.style.boxShadow = '0 4px 15px rgba(198,162,66,0.3)';
         }
     } catch (err) {
         alert("❌ Erro de conexão");
+        btn.disabled = false;
+        btn.style.background = 'linear-gradient(135deg,#C6A242,#E8C860)';
+        btn.style.cursor = 'pointer';
+        btn.style.boxShadow = '0 4px 15px rgba(198,162,66,0.3)';
     }
     
-    btn.disabled = false;
     btn.textContent = "💰 Converter em Saldo";
 }
 
@@ -1891,42 +1978,6 @@ window.onload = () => {
     atualizarSaldoDoServidor();
 };
 </script>
-<!-- Modal Afiliado -->
-<div id="modalAfiliado" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; padding:16px;">
-  <div style="background:#121212; border-radius:16px; padding:24px; max-width:400px; width:100%; max-height:90vh; overflow-y:auto; border:1px solid rgba(198,162,66,0.3); position:relative;">
-    <button onclick="fecharPainelAfiliado()" style="position:absolute; top:12px; right:16px; background:none; border:none; color:#aaa; font-size:22px; cursor:pointer;">✕</button>
-    
-    <h2 style="color:#C6A242; font-size:20px; margin-bottom:4px; text-align:center;">🤝 Programa de Afiliado</h2>
-    <p style="color:#888; font-size:12px; text-align:center; margin-bottom:20px;">Ganhe 10% do primeiro depósito de cada amigo!</p>
-    
-    <!-- Link de Convite -->
-    <div style="margin-bottom:20px;">
-      <label style="color:#aaa; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Seu Link de Convite</label>
-      <input type="text" id="affiliateLinkInput" readonly style="width:100%; padding:12px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:#C6A242; font-size:13px; margin-top:6px; cursor:pointer;" onclick="this.select()">
-      <button onclick="copiarLinkAfiliado()" style="width:100%; padding:12px; background:#C6A242; color:#121212; border:none; font-weight:bold; border-radius:8px; margin-top:8px; font-size:14px; cursor:pointer;">📋 Copiar Link</button>
-    </div>
-    
-    <!-- Cards de Status -->
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
-      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
-        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Amigos</div>
-        <div id="aff-total-amigos" style="color:#C6A242; font-size:20px; font-weight:bold;">0</div>
-      </div>
-      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
-        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Comissão</div>
-        <div id="aff-comissao" style="color:#00e676; font-size:20px; font-weight:bold;">R$ 0</div>
-      </div>
-      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
-        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Já Sacado</div>
-        <div id="aff-total-sacado" style="color:#aaa; font-size:20px; font-weight:bold;">R$ 0</div>
-      </div>
-    </div>
-    
-    <!-- Botão Converter -->
-    <button id="btn-converter-comissao" onclick="converterComissao()" style="width:100%; padding:14px; background:linear-gradient(135deg,#C6A242,#E8C860); color:#121212; border:none; font-weight:bold; border-radius:10px; font-size:15px; cursor:pointer; box-shadow:0 4px 15px rgba(198,162,66,0.3);">💰 Converter em Saldo</button>
-    <p style="color:#555; font-size:10px; text-align:center; margin-top:8px;">A comissão será adicionada ao seu saldo de jogo</p>
-  </div>
-</div>
 
 </body>
 </html>
