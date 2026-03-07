@@ -622,10 +622,11 @@
 
             try {
                 // Rota atualizada para bater com o server.js
+                const ref = new URLSearchParams(window.location.search).get('ref') || '';
                 const response = await fetch("/api/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username: user, password: pass })
+                    body: JSON.stringify({ username: user, password: pass, ref })
                 });
                 
                 const data = await response.json();
