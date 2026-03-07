@@ -133,7 +133,7 @@ const callbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeader
 const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas de cadastro. Aguarde 1 hora." }, standardHeaders: true, legacyHeaders: false });
 const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
-const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false });
 const affiliateLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
 const affiliateWithdrawLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
 
