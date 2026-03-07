@@ -96,8 +96,10 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     saldo: { type: Number, default: 0 },
+    affiliateLink: { type: String, default: null, unique: true, sparse: true },
     indicadoPor: { type: String, default: null },
     comissao: { type: Number, default: 0 },
+    primeiroDepositoPago: { type: Boolean, default: false },
     premioToken: { type: String, default: null },
     premioValor: { type: Number, default: null }
 });
@@ -127,6 +129,7 @@ const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const pixLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 const callbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas de cadastro. Aguarde 1 hora." }, standardHeaders: true, legacyHeaders: false });
 const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
@@ -234,7 +237,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 // --- RESTANTE DAS ROTAS (REGISTER, LOGIN, APOSTA, ADMIN...) ---
 
-app.post("/api/callback-pix", async (req, res) => {
+app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
     console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
 
     try {
@@ -279,6 +282,32 @@ app.post("/api/callback-pix", async (req, res) => {
 
         if (atualizado) {
             console.log(`✅ Saldo atualizado para ${deposito.username}: +R$ ${deposito.valor.toFixed(2)} (Novo saldo: R$ ${atualizado.saldo.toFixed(2)}) [ext_id: ${externalId}]`);
+
+            // Comissão de afiliado: 10% sobre o primeiro depósito do indicado (operação atômica)
+            if (atualizado.indicadoPor) {
+                const marcouPrimeiro = await User.findOneAndUpdate(
+                    { username: deposito.username, primeiroDepositoPago: false },
+                    { $set: { primeiroDepositoPago: true } },
+                    { new: false }
+                );
+                if (marcouPrimeiro) {
+                    const comissaoValor = Math.round(deposito.valor * 0.10 * 100) / 100;
+                    try {
+                        const referrer = await User.findOneAndUpdate(
+                            { username: atualizado.indicadoPor },
+                            { $inc: { saldo: comissaoValor, comissao: comissaoValor } },
+                            { new: true }
+                        );
+                        if (referrer) {
+                            console.log(`💰 Comissão de afiliado: +R$ ${comissaoValor.toFixed(2)} para ${atualizado.indicadoPor} (indicou ${deposito.username})`);
+                        } else {
+                            console.log(`⚠️ Indicador não encontrado para comissão: ${atualizado.indicadoPor}`);
+                        }
+                    } catch (commErr) {
+                        console.error(`❌ Erro ao creditar comissão para ${atualizado.indicadoPor}:`, commErr);
+                    }
+                }
+            }
         } else {
             console.log(`❌ Usuário não encontrado: ${deposito.username}`);
         }
@@ -290,7 +319,7 @@ app.post("/api/callback-pix", async (req, res) => {
     }
 });
 
-app.post("/api/register", async (req, res) => {
+app.post("/api/register", registerLimiter, async (req, res) => {
     try {
         const { username, password, ref } = req.body;
 
@@ -310,8 +339,29 @@ app.post("/api/register", async (req, res) => {
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const cleanRef = ref ? sanitizar(ref.trim().toLowerCase()) : null;
-        const novo = new User({ username: cleanUsername, password: hashedPassword, indicadoPor: cleanRef });
+
+        // Gerar link de afiliado único (8 chars hex)
+        let affiliateLink = null;
+        let attempts = 0;
+        while (!affiliateLink && attempts < 10) {
+            const candidate = crypto.randomBytes(4).toString('hex');
+            const exists = await User.findOne({ affiliateLink: candidate });
+            if (!exists) affiliateLink = candidate;
+            attempts++;
+        }
+        if (!affiliateLink) {
+            return res.status(500).json({ success: false, message: "Erro interno ao gerar link de afiliado. Tente novamente." });
+        }
+
+        // Resolver indicador pelo código de afiliado (affiliateLink)
+        let indicadoPor = null;
+        if (ref && typeof ref === 'string') {
+            const cleanRef = sanitizar(ref.trim().toLowerCase());
+            const referrer = await User.findOne({ affiliateLink: cleanRef });
+            if (referrer) indicadoPor = referrer.username;
+        }
+
+        const novo = new User({ username: cleanUsername, password: hashedPassword, affiliateLink, indicadoPor });
         await novo.save();
         res.json({ success: true });
     } catch (err) {
@@ -328,7 +378,7 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     const user = await User.findOne({ username: cleanUsername });
     if (user && await bcrypt.compare(password, user.password)) {
         const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '24h' });
-        return res.json({ success: true, username: user.username, saldo: user.saldo, token });
+        return res.json({ success: true, username: user.username, saldo: user.saldo, affiliateLink: user.affiliateLink, token });
     }
     res.status(400).json({ success: false });
 });
@@ -375,7 +425,7 @@ app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
 app.get("/api/saldo", autenticar, async (req, res) => {
     const user = await User.findOne({ username: req.usuario.username });
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    res.json({ success: true, saldo: user.saldo });
+    res.json({ success: true, saldo: user.saldo, affiliateLink: user.affiliateLink });
 });
 
 app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
@@ -438,6 +488,18 @@ app.post("/admin/add-saldo", adminLimiter, async (req, res) => {
     if (isNaN(valorAdd) || !isFinite(valorAdd)) return res.status(400).json({ success: false, message: "Valor inválido" });
     await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: valorAdd } });
     res.json({ success: true });
+});
+
+app.post("/admin/financeiro", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const [depositoResult, saqueResult] = await Promise.all([
+        Deposito.aggregate([{ $match: { status: "pago" } }, { $group: { _id: null, total: { $sum: "$valor" } } }]),
+        Saque.aggregate([{ $match: { status: { $in: ["aprovado", "pago"] } } }, { $group: { _id: null, total: { $sum: "$valor" } } }])
+    ]);
+    const totalDepositos = depositoResult[0]?.total || 0;
+    const totalSaques = saqueResult[0]?.total || 0;
+    const ggr = totalDepositos - totalSaques;
+    res.json({ success: true, totalDepositos, totalSaques, ggr });
 });
 
 app.listen(process.env.PORT || 10000, '0.0.0.0', () => {

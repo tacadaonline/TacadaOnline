@@ -466,6 +466,7 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 <div class="finance-area">
   <button class="btn-finance btn-dep" onclick="abrirModal('deposito')">📥 Depósito</button>
   <button class="btn-finance btn-saq" onclick="abrirModal('saque')">📤 Saque</button>
+  <button class="btn-finance" style="background:#6a0dad;" onclick="abrirModal('afiliado')">🔗 Indicar</button>
 </div>
 
 <div id="canvas-container">
@@ -509,6 +510,7 @@ let dificuldadeRTP = 0.95;
 let jogoAtivo = false;
 let apostando = false;
 let _saldoServidor = 0;
+let _affiliateLink = null;
 let _ultimaApostaTimestamp = 0;
 let bolaMovida = false;
 let velocidadeBranca = { x: 0, y: 0 };
@@ -1416,6 +1418,7 @@ async function atualizarSaldoDoServidor(retries = 3, forceUpdate = false) {
         const data = await res.json();
         if(data.success) {
             setSaldo(data.saldo);
+            if (data.affiliateLink) _affiliateLink = data.affiliateLink;
         } else {
             console.log("❌ Erro ao buscar saldo:", data.error);
             if (retries > 0) {
@@ -1639,8 +1642,28 @@ function abrirModal(tipo) {
     modal.style.display = "flex";
     if(tipo === 'deposito') {
         cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><div id="qR"></div><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">Gerar QR Code</button>`;
+    } else if(tipo === 'afiliado') {
+        const baseUrl = window.location.origin + '/cadastro.html';
+        const link = _affiliateLink ? `${baseUrl}?ref=${_affiliateLink}` : 'Carregando...';
+        cont.innerHTML = `<h2>🔗 Seu Link de Indicação</h2>
+            <p style="color:#aaa;font-size:13px;margin-bottom:10px;">Ganhe 10% do primeiro depósito de cada amigo indicado!</p>
+            <input type="text" id="affiliateLinkInput" value="${link}" readonly style="background:#111;color:#ffd700;font-size:13px;cursor:pointer;" onclick="this.select()">
+            <button onclick="copiarLinkAfiliado()" style="width:100%;padding:12px;background:#6a0dad;color:#fff;border:none;font-weight:bold;border-radius:6px;margin-top:8px;">📋 Copiar Link</button>`;
     } else {
         cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">Solicitar Saque</button>`;
+    }
+}
+
+function copiarLinkAfiliado() {
+    const input = document.getElementById("affiliateLinkInput");
+    if (!input) return;
+    const texto = input.value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(() => {
+            alert("✅ Link de indicação copiado!");
+        }).catch(() => alert("❌ Não foi possível copiar. Selecione e copie manualmente."));
+    } else {
+        alert("❌ Copie o link manualmente: " + texto);
     }
 }
 
@@ -1772,6 +1795,7 @@ document.addEventListener('contextmenu', function(e) {
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
+    _affiliateLink = localStorage.getItem("affiliateLink") || null;
     atualizarSaldoDoServidor();
 };
 </script>
