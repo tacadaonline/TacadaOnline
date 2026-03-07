@@ -1417,6 +1417,10 @@ async function atualizarSaldoDoServidor(retries = 3, forceUpdate = false) {
         const data = await res.json();
         if(data.success) {
             setSaldo(data.saldo);
+            if (data.affiliateLink) {
+                _affiliateLink = data.affiliateLink;
+                localStorage.setItem("affiliateLink", data.affiliateLink);
+            }
         } else {
             console.log("❌ Erro ao buscar saldo:", data.error);
             if (retries > 0) {
@@ -1799,21 +1803,52 @@ async function abrirPainelAfiliado() {
     // Buscar dados do afiliado do servidor
     try {
         const token = localStorage.getItem("token");
+        if (!token) {
+            if (!_affiliateLink) linkInput.value = 'Faça login novamente';
+            return;
+        }
+
         const res = await fetch("/api/affiliate-stats", {
             headers: { "Authorization": "Bearer " + token }
         });
-        const data = await res.json();
-        if (data.success) {
-            document.getElementById("aff-total-amigos").textContent = data.totalAmigos || 0;
-            document.getElementById("aff-comissao").textContent = "R$ " + (data.comissao || 0).toFixed(2);
-            document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
-            if (data.affiliateLink) {
-                _affiliateLink = data.affiliateLink;
-                linkInput.value = baseUrl + '?ref=' + data.affiliateLink;
+
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("aff-total-amigos").textContent = data.totalAmigos || 0;
+                document.getElementById("aff-comissao").textContent = "R$ " + (data.comissao || 0).toFixed(2);
+                document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
+                if (data.affiliateLink) {
+                    _affiliateLink = data.affiliateLink;
+                    localStorage.setItem("affiliateLink", data.affiliateLink);
+                    linkInput.value = baseUrl + '?ref=' + data.affiliateLink;
+                }
+                return;
+            }
+        }
+
+        // Se affiliate-stats falhou, usar /api/saldo como fallback
+        const saldoRes = await fetch("/api/saldo", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+        if (saldoRes.ok) {
+            const saldoData = await saldoRes.json();
+            if (saldoData.success && saldoData.affiliateLink) {
+                _affiliateLink = saldoData.affiliateLink;
+                localStorage.setItem("affiliateLink", saldoData.affiliateLink);
+                linkInput.value = baseUrl + '?ref=' + saldoData.affiliateLink;
             }
         }
     } catch (err) {
         console.error("Erro ao buscar dados de afiliado:", err);
+        // Último recurso: usar localStorage
+        const stored = localStorage.getItem("affiliateLink");
+        if (stored) {
+            _affiliateLink = stored;
+            linkInput.value = baseUrl + '?ref=' + stored;
+        } else if (!_affiliateLink) {
+            linkInput.value = 'Erro ao carregar. Tente novamente.';
+        }
     }
 }
 
