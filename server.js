@@ -23,6 +23,10 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    // NOTE: 'unsafe-inline' is required because the frontend uses extensive inline scripts/styles.
+    // To harden further, migrate inline code to external files and use nonces.
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'");
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
 });
 app.use(express.static(path.join(__dirname, "public")));
@@ -130,7 +134,7 @@ const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const pixLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 const callbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
-const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas de cadastro. Aguarde 1 hora." }, standardHeaders: true, legacyHeaders: false });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { success: false, message: "Muitas tentativas de cadastro. Aguarde 1 hora." }, standardHeaders: true, legacyHeaders: false });
 const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false });
@@ -272,7 +276,7 @@ app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
         );
 
         if (!deposito) {
-            console.log(`⚠️ Depósito não encontrado ou já pago: ${externalId}`);
+            console.log(`[AUDIT] callback-pix duplicado ou inexistente ignorado: external_id=${externalId} status=${status}`);
             return res.json({ received: true });
         }
 
@@ -369,7 +373,7 @@ app.post("/api/register", registerLimiter, async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ success: false, message: "Usuário já existe" });
+            return res.status(400).json({ success: false, message: "Erro no cadastro" });
         }
         res.status(400).json({ success: false, message: "Erro no cadastro" });
     }
@@ -454,33 +458,32 @@ app.get("/api/affiliate-stats", affiliateLimiter, autenticar, async (req, res) =
 
 app.post("/api/affiliate-withdraw", affiliateWithdrawLimiter, autenticar, async (req, res) => {
     try {
-        const user = await User.findOne({ username: req.usuario.username });
-        if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
-        
-        const comissao = user.comissao || 0;
-        if (comissao <= 0) {
+        // Fully atomic: check comissao > 0 and transfer to saldo in one operation (prevents race conditions)
+        const oldUser = await User.findOneAndUpdate(
+            { username: req.usuario.username, comissao: { $gt: 0 } },
+            [{ $set: {
+                saldo: { $add: ["$saldo", "$comissao"] },
+                comissaoSacada: { $add: [{ $ifNull: ["$comissaoSacada", 0] }, "$comissao"] },
+                comissao: 0
+            }}],
+            { new: false }
+        );
+
+        if (!oldUser) {
             return res.status(400).json({ success: false, message: "Sem comissão disponível para converter" });
         }
-        
-        // Transferir comissão para saldo e zerar comissão, incrementar comissaoSacada
-        const atualizado = await User.findOneAndUpdate(
-            { username: req.usuario.username, comissao: { $gte: comissao } },
-            { 
-                $inc: { saldo: comissao, comissaoSacada: comissao },
-                $set: { comissao: 0 }
-            },
-            { new: true }
-        );
-        
-        if (!atualizado) {
-            return res.status(400).json({ success: false, message: "Erro ao converter comissão" });
-        }
-        
+
+        const valorConvertido = oldUser.comissao || 0;
+        const novoSaldo = (oldUser.saldo || 0) + valorConvertido;
+        const totalSacado = (oldUser.comissaoSacada || 0) + valorConvertido;
+
+        console.log(`[AUDIT] affiliate-withdraw: usuario=${req.usuario.username} converteu R$ ${valorConvertido.toFixed(2)} em saldo em ${new Date().toISOString()}`);
+
         res.json({
             success: true,
-            valorConvertido: comissao,
-            novoSaldo: atualizado.saldo,
-            totalSacado: atualizado.comissaoSacada || 0
+            valorConvertido: valorConvertido,
+            novoSaldo: novoSaldo,
+            totalSacado: totalSacado
         });
     } catch (err) {
         console.error("Erro ao sacar comissão:", err);
