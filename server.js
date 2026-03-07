@@ -15,7 +15,11 @@ const QRCode = require('qrcode');
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+const allowedOrigin = process.env.FRONTEND_URL;
+if (!allowedOrigin) {
+    console.warn("⚠️ FRONTEND_URL não configurado. CORS permitirá apenas same-origin.");
+}
+app.use(cors({ origin: allowedOrigin || false }));
 app.use(express.json());
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -28,6 +32,10 @@ app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'");
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
+});
+// Block direct access to admin panel via static files
+app.use('/painelrei777.html', (req, res) => {
+    res.status(404).send('Not Found');
 });
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -89,10 +97,19 @@ if (!ADMIN_PASSWORD_FIXA) {
     console.error("❌ ERRO CRÍTICO: ADMIN_PASS não configurada nas variáveis de ambiente.");
     process.exit(1);
 }
+const ADMIN_PANEL_PATH = process.env.ADMIN_PANEL_PATH || ('/admin-panel-' + crypto.randomBytes(8).toString('hex'));
 let globalRTP = 0.30;
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ BANCO CONECTADO"))
+    .then(async () => {
+        console.log("✅ BANCO CONECTADO");
+        const rtpConfig = await Config.findOne({ key: 'rtp' });
+        if (rtpConfig) {
+            globalRTP = rtpConfig.value;
+            console.log(`✅ RTP carregado do banco: ${globalRTP}`);
+        }
+        console.log(`🔐 Admin panel path: ${ADMIN_PANEL_PATH}`);
+    })
     .catch(err => console.error("❌ ERRO BANCO:", err));
 
 // --- SCHEMAS ---
@@ -129,6 +146,12 @@ const DepositoSchema = new mongoose.Schema({
 });
 const Deposito = mongoose.model("Deposito", DepositoSchema);
 
+const ConfigSchema = new mongoose.Schema({
+    key: { type: String, required: true, unique: true },
+    value: { type: mongoose.Schema.Types.Mixed, required: true }
+});
+const Config = mongoose.model("Config", ConfigSchema);
+
 // --- LIMITADORES ---
 const apostaLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const premioLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
@@ -147,13 +170,12 @@ function sanitizar(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// --- VERIFICAR SENHA ADMIN (timing-safe) ---
+// --- VERIFICAR SENHA ADMIN (timing-safe via hash) ---
 function verificarSenhaAdmin(input) {
     if (!input || typeof input !== 'string') return false;
-    const a = Buffer.from(input);
-    const b = Buffer.from(ADMIN_PASSWORD_FIXA);
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
+    const hashInput = crypto.createHash('sha256').update(input).digest();
+    const hashAdmin = crypto.createHash('sha256').update(ADMIN_PASSWORD_FIXA).digest();
+    return crypto.timingSafeEqual(hashInput, hashAdmin);
 }
 
 // --- MIDDLEWARE: AUTENTICAR JWT ---
@@ -168,6 +190,11 @@ function autenticar(req, res, next) {
         return res.status(403).json({ success: false, message: 'Token inválido' });
     }
 }
+
+// Admin panel served from root directory (outside public/) via protected route
+app.get(ADMIN_PANEL_PATH, adminLimiter, (req, res) => {
+    res.sendFile(path.join(__dirname, "painelrei777.html"));
+});
 
 // --- ROTA: GERAR PIX (BSPAY COM PROXY) ---
 app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
@@ -191,7 +218,7 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
                 document: cpf || "00000000000",
                 email: email || `${username}@email.com`
             },
-            postbackUrl: `https://${req.get('host')}/api/callback-pix`
+            postbackUrl: `https://${req.get('host')}/api/callback-pix${process.env.BSPAY_WEBHOOK_SECRET ? '?token=' + process.env.BSPAY_WEBHOOK_SECRET : ''}`
         };
 
         // --- CHAMADA COM URL COMPLETA E HEADERS ---
@@ -246,6 +273,16 @@ app.post("/api/gerar-pix", pixLimiter, autenticar, async (req, res) => {
 
 app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
     console.log("📩 Callback PIX recebido:", JSON.stringify(req.body, null, 2));
+
+    // Verificar token secreto do webhook
+    const webhookSecret = process.env.BSPAY_WEBHOOK_SECRET;
+    if (webhookSecret) {
+        const receivedToken = req.headers['x-webhook-secret'] || req.query.token;
+        if (receivedToken !== webhookSecret) {
+            console.log("[SECURITY] Callback PIX rejeitado: token inválido");
+            return res.status(403).json({ received: false, error: "Não autorizado" });
+        }
+    }
 
     try {
         const rawBody = req.body;
@@ -340,8 +377,8 @@ app.post("/api/register", registerLimiter, async (req, res) => {
             return res.status(400).json({ success: false, message: "Usuário inválido. Use apenas letras, números, _ ou -. Mínimo 3, máximo 30 caracteres." });
         }
 
-        if (password.length < 3 || password.length > 128) {
-            return res.status(400).json({ success: false, message: "Senha inválida" });
+        if (password.length < 6 || password.length > 128) {
+            return res.status(400).json({ success: false, message: "Senha deve ter entre 6 e 128 caracteres." });
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -404,9 +441,6 @@ app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
         { new: true }
     );
     if (!atualizado) return res.status(400).json({ success: false, message: "Saldo insuficiente" });
-    if (!ganhou && atualizado.indicadoPor) {
-        await User.findOneAndUpdate({ username: atualizado.indicadoPor }, { $inc: { comissao: valorAposta * 0.10 } });
-    }
     let premioToken = null;
     if (ganhou) {
         premioToken = crypto.randomBytes(32).toString('hex');
@@ -418,14 +452,21 @@ app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
 app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
     const username = req.usuario.username;
     const { premioToken } = req.body;
+    if (!premioToken || typeof premioToken !== 'string') {
+        return res.status(400).json({ success: false, message: "Token inválido" });
+    }
     const user = await User.findOneAndUpdate(
         { username: username.trim().toLowerCase(), premioToken: premioToken, premioValor: { $ne: null } },
-        { $set: { premioToken: null } },
+        { $set: { premioToken: null, premioValor: null } },
         { new: false }
     );
     if (!user || !user.premioValor) return res.status(400).json({ success: false, message: "Token inválido" });
     const premio = user.premioValor * 10;
-    const atualizado = await User.findOneAndUpdate({ username: username.trim().toLowerCase() }, { $inc: { saldo: premio }, $set: { premioValor: null } }, { new: true });
+    const atualizado = await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase() },
+        { $inc: { saldo: premio } },
+        { new: true }
+    );
     res.json({ success: true, saldo: atualizado.saldo });
 });
 
@@ -528,13 +569,14 @@ app.post("/admin/saques-pendentes", adminLimiter, async (req, res) => {
     res.json({ success: true, saques });
 });
 
-app.post("/admin/set-rtp", adminLimiter, (req, res) => {
+app.post("/admin/set-rtp", adminLimiter, async (req, res) => {
     if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     const rtp = parseFloat(req.body.rtp);
     if (isNaN(rtp) || !isFinite(rtp) || rtp < 0 || rtp > 1) {
         return res.status(400).json({ success: false, message: "RTP deve ser entre 0 e 1" });
     }
     globalRTP = rtp;
+    await Config.findOneAndUpdate({ key: 'rtp' }, { value: rtp }, { upsert: true });
     res.json({ success: true });
 });
 

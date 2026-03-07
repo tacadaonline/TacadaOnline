@@ -611,8 +611,8 @@
             const erroEl = document.getElementById('erro');
             const btn = document.getElementById('btnCadastrar');
 
-            if (user.length < 3 || pass.length < 3) {
-                erroEl.innerText = "Mínimo de 3 caracteres.";
+            if (user.length < 3 || pass.length < 6) {
+                erroEl.innerText = "Usuário mínimo 3 caracteres e senha mínimo 6 caracteres.";
                 return;
             }
 
