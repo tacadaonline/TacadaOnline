@@ -1956,7 +1956,21 @@ function abrirModal(tipo) {
     if(tipo === 'deposito') {
         cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><div id="qR"></div><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">Gerar QR Code</button>`;
     } else {
-        cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">Solicitar Saque</button>`;
+        const token = localStorage.getItem("token");
+        cont.innerHTML = `<h2>Sacar Saldo</h2><div id="rolloverInfo"></div><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">Solicitar Saque</button>`;
+        if (token) {
+            fetch('/api/saldo', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.rollover_required > 0) {
+                        const el = document.getElementById("rolloverInfo");
+                        if (el) {
+                            el.innerHTML = `<div style="background:#1a1a1a; border:1px solid #f44336; border-radius:6px; padding:12px; margin-bottom:12px; color:#fff; font-size:13px;">🔒 Faltam <strong>R$ ${data.rollover_required.toFixed(2)}</strong> em apostas para liberar seu saque.</div>`;
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
     }
 }
 
@@ -2066,7 +2080,11 @@ async function fazerSaque() {
             fecharModal();
             atualizarSaldoDoServidor();
         } else {
-            alert("❌ " + (data.message || "Erro ao solicitar saque. Saldo insuficiente?"));
+            if (data.rollover_remaining !== undefined) {
+                alert("🔒 Saque bloqueado!\n\n" + (data.message || "Complete o rollover antes de sacar."));
+            } else {
+                alert("❌ " + (data.message || "Erro ao solicitar saque. Saldo insuficiente?"));
+            }
         }
     } catch(e) {
         alert("❌ Erro de conexão. Tente novamente.");

@@ -99,6 +99,7 @@ if (!ADMIN_PASSWORD_FIXA) {
 }
 const ADMIN_PANEL_PATH = process.env.ADMIN_PANEL_PATH || ('/admin-panel-' + crypto.randomBytes(8).toString('hex'));
 let globalRTP = 0.30;
+let globalRolloverMultiplier = 1.0;
 
 mongoose.connect(MONGO_URI)
     .then(async () => {
@@ -107,6 +108,11 @@ mongoose.connect(MONGO_URI)
         if (rtpConfig) {
             globalRTP = rtpConfig.value;
             console.log(`✅ RTP carregado do banco: ${globalRTP}`);
+        }
+        const rolloverConfig = await Config.findOne({ key: 'rollover_multiplier' });
+        if (rolloverConfig) {
+            globalRolloverMultiplier = rolloverConfig.value;
+            console.log(`✅ Rollover multiplier carregado do banco: ${globalRolloverMultiplier}`);
         }
         console.log(`🔐 Admin panel path: ${ADMIN_PANEL_PATH}`);
     })
@@ -123,7 +129,9 @@ const UserSchema = new mongoose.Schema({
     comissaoSacada: { type: Number, default: 0 },
     primeiroDepositoPago: { type: Boolean, default: false },
     premioToken: { type: String, default: null },
-    premioValor: { type: Number, default: null }
+    premioValor: { type: Number, default: null },
+    rollover_required: { type: Number, default: 0 },
+    rollover_met: { type: Boolean, default: true }
 });
 const User = mongoose.model("User", UserSchema);
 
@@ -327,6 +335,16 @@ app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
         if (atualizado) {
             console.log(`✅ Saldo atualizado para ${deposito.username}: +R$ ${deposito.valor.toFixed(2)} (Novo saldo: R$ ${atualizado.saldo.toFixed(2)}) [ext_id: ${externalId}]`);
 
+            // Adicionar rollover: deposito.valor * multiplicador
+            const rolloverAdd = Math.round(deposito.valor * globalRolloverMultiplier * 100) / 100;
+            if (rolloverAdd > 0) {
+                await User.findOneAndUpdate(
+                    { username: deposito.username },
+                    { $inc: { rollover_required: rolloverAdd }, $set: { rollover_met: false } }
+                );
+                console.log(`[ROLLOVER] +R$ ${rolloverAdd.toFixed(2)} adicionado para ${deposito.username} (depósito R$ ${deposito.valor.toFixed(2)} × ${globalRolloverMultiplier})`);
+            }
+
             // Comissão de afiliado: 10% sobre o primeiro depósito do indicado (operação atômica)
             if (atualizado.indicadoPor) {
                 const marcouPrimeiro = await User.findOneAndUpdate(
@@ -441,6 +459,14 @@ app.post("/api/aposta", apostaLimiter, autenticar, async (req, res) => {
         { new: true }
     );
     if (!atualizado) return res.status(400).json({ success: false, message: "Saldo insuficiente" });
+    // Subtrair rollover
+    await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase(), rollover_required: { $gt: 0 } },
+        [
+            { $set: { rollover_required: { $max: [0, { $subtract: ["$rollover_required", valorAposta] }] } } },
+            { $set: { rollover_met: { $lte: ["$rollover_required", 0] } } }
+        ]
+    );
     let premioToken = null;
     if (ganhou) {
         premioToken = crypto.randomBytes(32).toString('hex');
@@ -473,7 +499,7 @@ app.post("/api/premio", premioLimiter, autenticar, async (req, res) => {
 app.get("/api/saldo", autenticar, async (req, res) => {
     const user = await User.findOne({ username: req.usuario.username });
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    res.json({ success: true, saldo: user.saldo, affiliateLink: user.affiliateLink });
+    res.json({ success: true, saldo: user.saldo, affiliateLink: user.affiliateLink, rollover_required: user.rollover_required || 0, rollover_met: user.rollover_met !== false });
 });
 
 app.get("/api/affiliate-stats", affiliateLimiter, autenticar, async (req, res) => {
@@ -546,6 +572,15 @@ app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
     const valorSaque = Math.round(valor * 100) / 100;
     const chavePix = sanitizar(pix.trim());
 
+    const userCheck = await User.findOne({ username: username.trim().toLowerCase() });
+    if (userCheck && userCheck.rollover_required > 0) {
+        return res.status(400).json({
+            success: false,
+            message: `Você ainda precisa apostar R$ ${userCheck.rollover_required.toFixed(2)} para liberar o saque.`,
+            rollover_remaining: userCheck.rollover_required
+        });
+    }
+
     const atualizado = await User.findOneAndUpdate(
         { username: username.trim().toLowerCase(), saldo: { $gte: valorSaque } },
         { $inc: { saldo: -valorSaque } },
@@ -559,7 +594,7 @@ app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
 
 app.post("/admin/usuarios", adminLimiter, async (req, res) => {
     if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
-    const users = await User.find({}, 'username saldo indicadoPor comissao').sort({ saldo: -1 });
+    const users = await User.find({}, 'username saldo indicadoPor comissao rollover_required rollover_met').sort({ saldo: -1 });
     res.json({ success: true, usuarios: users });
 });
 
@@ -583,6 +618,36 @@ app.post("/admin/set-rtp", adminLimiter, async (req, res) => {
 app.post("/admin/get-rtp", adminLimiter, (req, res) => {
     if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     res.json({ success: true, rtp: globalRTP });
+});
+
+app.post("/admin/set-rollover", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const multiplier = parseFloat(req.body.multiplier);
+    if (isNaN(multiplier) || !isFinite(multiplier) || multiplier < 0 || multiplier > 100) {
+        return res.status(400).json({ success: false, message: "Multiplicador deve ser entre 0 e 100" });
+    }
+    globalRolloverMultiplier = multiplier;
+    await Config.findOneAndUpdate({ key: 'rollover_multiplier' }, { value: multiplier }, { upsert: true });
+    res.json({ success: true });
+});
+
+app.post("/admin/get-rollover", adminLimiter, (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    res.json({ success: true, multiplier: globalRolloverMultiplier });
+});
+
+app.post("/admin/set-user-rollover", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const { username, rollover_required } = req.body;
+    if (!username || typeof username !== 'string') return res.status(400).json({ success: false, message: "Usuário inválido" });
+    const rolloverVal = parseFloat(rollover_required);
+    if (isNaN(rolloverVal) || !isFinite(rolloverVal) || rolloverVal < 0) return res.status(400).json({ success: false, message: "Valor de rollover inválido" });
+    const rounded = Math.round(rolloverVal * 100) / 100;
+    await User.findOneAndUpdate(
+        { username: username.trim().toLowerCase() },
+        { $set: { rollover_required: rounded, rollover_met: rounded <= 0 } }
+    );
+    res.json({ success: true });
 });
 
 app.post("/admin/add-saldo", adminLimiter, async (req, res) => {
