@@ -617,6 +617,87 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
     animation: toastSlideDown 0.3s ease;
     letter-spacing: 0.5px;
   }
+
+  /* Tutorial Overlay */
+  @keyframes fingerDrag {
+    0%   { transform: translate(0, 0); opacity: 1; }
+    40%  { transform: translate(18px, 22px); opacity: 1; }
+    70%  { transform: translate(18px, 22px); opacity: 1; }
+    85%  { transform: translate(18px, 22px); opacity: 0; }
+    100% { transform: translate(0, 0); opacity: 0; }
+  }
+  @keyframes elasticLine {
+    0%   { stroke-dashoffset: 0; opacity: 0; }
+    10%  { opacity: 0.85; }
+    40%  { opacity: 0.85; stroke-dashoffset: 0; }
+    70%  { opacity: 0.85; }
+    85%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  @keyframes tutorialFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  #tutorial-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    border-radius: 10px;
+    border: 1px solid rgba(212,175,55,0.3);
+    transition: opacity 0.5s ease;
+    animation: tutorialFadeIn 0.6s ease;
+  }
+  #tutorial-overlay.hidden {
+    opacity: 0;
+  }
+  .tutorial-animation {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    margin-bottom: 14px;
+  }
+  .tutorial-elastic {
+    position: absolute;
+    top: 22px; left: 22px;
+    width: 70px; height: 2px;
+    transform-origin: left center;
+    transform: rotate(52deg);
+    overflow: visible;
+  }
+  .tutorial-elastic line {
+    stroke: #FFD700;
+    stroke-width: 2.5;
+    stroke-dasharray: 4,3;
+    animation: elasticLine 2s ease-in-out infinite;
+  }
+  .tutorial-finger {
+    position: absolute;
+    top: 8px; left: 8px;
+    font-size: 28px;
+    line-height: 1;
+    filter: drop-shadow(0 0 6px rgba(255,215,0,0.75));
+    animation: fingerDrag 2s ease-in-out infinite;
+    user-select: none;
+  }
+  .tutorial-text {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    text-align: center;
+    padding: 0 12px;
+    margin: 0;
+    font-family: 'Lexend', 'Segoe UI', Arial, sans-serif;
+  }
 </style>
 </head>
 <body>
@@ -650,6 +731,16 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
     <!-- Linha única do estilingue -->
     <line id="aim-line" x1="0" y1="0" x2="0" y2="0" stroke="#FFD700" stroke-width="1.5" opacity="0.4" stroke-dasharray="3,2"/>
   </svg>
+  <!-- Tutorial Overlay -->
+  <div id="tutorial-overlay">
+    <div class="tutorial-animation">
+      <svg class="tutorial-elastic" viewBox="0 0 70 2" xmlns="http://www.w3.org/2000/svg" style="width:70px;height:40px;overflow:visible;">
+        <line x1="0" y1="1" x2="60" y2="1" class="tutorial-elastic-line"/>
+      </svg>
+      <div class="tutorial-finger" role="img" aria-label="dedo indicando gesto de arrastar">👆</div>
+    </div>
+    <p class="tutorial-text">PUXE PARA TRÁS E SOLTE PARA LANÇAR</p>
+  </div>
 </div>
 </div><!-- /.canvas-area -->
 
@@ -1715,6 +1806,7 @@ async function confirmBet() {
         // O SERVIDOR JÁ DECIDIU AQUI SE ELE GANHOU OU PERDEU
         window.resultadoFinal = data.ganhou;
         window.premioToken = data.premioToken || null;
+        dismissTutorial();
 
         // Setar estado ANTES de qualquer outra coisa
         apostando = true;
@@ -2159,7 +2251,20 @@ window.onload = () => {
     atualizarLucro();
     _affiliateLink = localStorage.getItem("affiliateLink") || null;
     atualizarSaldoDoServidor();
+    if (localStorage.getItem('tutorialVisto') === '1') {
+        const ov = document.getElementById('tutorial-overlay');
+        if (ov) ov.style.display = 'none';
+    }
 };
+
+function dismissTutorial() {
+    const overlay = document.getElementById('tutorial-overlay');
+    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
+        overlay.classList.add('hidden');
+        setTimeout(() => { overlay.style.display = 'none'; }, 500);
+        localStorage.setItem('tutorialVisto', '1');
+    }
+}
 </script>
 
 </body>
