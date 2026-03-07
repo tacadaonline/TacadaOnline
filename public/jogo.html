@@ -449,7 +449,7 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 <body>
 
 <div class="header">
-  <div class="stat-box"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
+  <div class="stat-box" onclick="abrirPainelAfiliado()" style="cursor:pointer;"><span class="stat-label">Saldo</span><span id="saldo" class="stat-value">R$ 0.00</span></div>
   <div class="stat-box"><span class="stat-label">Retorno (10.0x)</span><span id="lucro" class="stat-value" style="color:#0f0">R$ 100.00</span></div>
   <div class="stat-box"><span class="stat-label">Tempo</span><span id="tempo" class="stat-value" style="color:#ff4444">3.50</span></div>
 </div>
@@ -466,7 +466,6 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 <div class="finance-area">
   <button class="btn-finance btn-dep" onclick="abrirModal('deposito')">📥 Depósito</button>
   <button class="btn-finance btn-saq" onclick="abrirModal('saque')">📤 Saque</button>
-  <button class="btn-finance" style="background:#6a0dad;" onclick="abrirModal('afiliado')">🔗 Indicar</button>
 </div>
 
 <div id="canvas-container">
@@ -1641,13 +1640,6 @@ function abrirModal(tipo) {
     modal.style.display = "flex";
     if(tipo === 'deposito') {
         cont.innerHTML = `<h2>Depósito PIX</h2><input type="number" id="vD" placeholder="Valor R$"><div id="qR"></div><button onclick="gerarPix()" style="width:100%; padding:12px; background:gold; border:none; font-weight:bold; border-radius:6px;">Gerar QR Code</button>`;
-    } else if(tipo === 'afiliado') {
-        const baseUrl = window.location.origin + '/cadastro.html';
-        const link = _affiliateLink ? `${baseUrl}?ref=${_affiliateLink}` : 'Carregando...';
-        cont.innerHTML = `<h2>🔗 Seu Link de Indicação</h2>
-            <p style="color:#aaa;font-size:13px;margin-bottom:10px;">Ganhe 10% do primeiro depósito de cada amigo indicado!</p>
-            <input type="text" id="affiliateLinkInput" value="${link}" readonly style="background:#111;color:#ffd700;font-size:13px;cursor:pointer;" onclick="this.select()">
-            <button onclick="copiarLinkAfiliado()" style="width:100%;padding:12px;background:#6a0dad;color:#fff;border:none;font-weight:bold;border-radius:6px;margin-top:8px;">📋 Copiar Link</button>`;
     } else {
         cont.innerHTML = `<h2>Sacar Saldo</h2><input type="number" id="vS" placeholder="Valor R$"><input type="text" id="cP" placeholder="Chave PIX"><button onclick="fazerSaque()" style="width:100%; padding:12px; background:#2979ff; color:#fff; border:none; font-weight:bold; border-radius:6px;">Solicitar Saque</button>`;
     }
@@ -1791,6 +1783,72 @@ document.addEventListener('contextmenu', function(e) {
     return false;
 });
 
+async function abrirPainelAfiliado() {
+    const modal = document.getElementById("modalAfiliado");
+    modal.style.display = "flex";
+    
+    // Preencher o link
+    const baseUrl = window.location.origin + '/cadastro.html';
+    const linkInput = document.getElementById("affiliateLinkInput");
+    if (_affiliateLink) {
+        linkInput.value = baseUrl + '?ref=' + _affiliateLink;
+    } else {
+        linkInput.value = 'Carregando...';
+    }
+    
+    // Buscar dados do afiliado do servidor
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/affiliate-stats", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById("aff-total-amigos").textContent = data.totalAmigos || 0;
+            document.getElementById("aff-comissao").textContent = "R$ " + (data.comissao || 0).toFixed(2);
+            document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
+            if (data.affiliateLink) {
+                _affiliateLink = data.affiliateLink;
+                linkInput.value = baseUrl + '?ref=' + data.affiliateLink;
+            }
+        }
+    } catch (err) {
+        console.error("Erro ao buscar dados de afiliado:", err);
+    }
+}
+
+function fecharPainelAfiliado() {
+    document.getElementById("modalAfiliado").style.display = "none";
+}
+
+async function converterComissao() {
+    const btn = document.getElementById("btn-converter-comissao");
+    btn.disabled = true;
+    btn.textContent = "Convertendo...";
+    
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/affiliate-withdraw", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert("✅ R$ " + data.valorConvertido.toFixed(2) + " adicionados ao seu saldo!");
+            setSaldo(data.novoSaldo);
+            document.getElementById("aff-comissao").textContent = "R$ 0.00";
+            document.getElementById("aff-total-sacado").textContent = "R$ " + (data.totalSacado || 0).toFixed(2);
+        } else {
+            alert("❌ " + (data.message || "Erro ao converter comissão"));
+        }
+    } catch (err) {
+        alert("❌ Erro de conexão");
+    }
+    
+    btn.disabled = false;
+    btn.textContent = "💰 Converter em Saldo";
+}
+
 window.onload = () => { 
     sortearPosicoes(); 
     atualizarLucro();
@@ -1798,5 +1856,42 @@ window.onload = () => {
     atualizarSaldoDoServidor();
 };
 </script>
+<!-- Modal Afiliado -->
+<div id="modalAfiliado" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#121212; border-radius:16px; padding:24px; max-width:400px; width:100%; max-height:90vh; overflow-y:auto; border:1px solid rgba(198,162,66,0.3); position:relative;">
+    <button onclick="fecharPainelAfiliado()" style="position:absolute; top:12px; right:16px; background:none; border:none; color:#aaa; font-size:22px; cursor:pointer;">✕</button>
+    
+    <h2 style="color:#C6A242; font-size:20px; margin-bottom:4px; text-align:center;">🤝 Programa de Afiliado</h2>
+    <p style="color:#888; font-size:12px; text-align:center; margin-bottom:20px;">Ganhe 10% do primeiro depósito de cada amigo!</p>
+    
+    <!-- Link de Convite -->
+    <div style="margin-bottom:20px;">
+      <label style="color:#aaa; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Seu Link de Convite</label>
+      <input type="text" id="affiliateLinkInput" readonly style="width:100%; padding:12px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:#C6A242; font-size:13px; margin-top:6px; cursor:pointer;" onclick="this.select()">
+      <button onclick="copiarLinkAfiliado()" style="width:100%; padding:12px; background:#C6A242; color:#121212; border:none; font-weight:bold; border-radius:8px; margin-top:8px; font-size:14px; cursor:pointer;">📋 Copiar Link</button>
+    </div>
+    
+    <!-- Cards de Status -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Amigos</div>
+        <div id="aff-total-amigos" style="color:#C6A242; font-size:20px; font-weight:bold;">0</div>
+      </div>
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Comissão</div>
+        <div id="aff-comissao" style="color:#00e676; font-size:20px; font-weight:bold;">R$ 0</div>
+      </div>
+      <div style="background:#1a1a1a; border-radius:10px; padding:14px 8px; text-align:center; border:1px solid #222;">
+        <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Já Sacado</div>
+        <div id="aff-total-sacado" style="color:#aaa; font-size:20px; font-weight:bold;">R$ 0</div>
+      </div>
+    </div>
+    
+    <!-- Botão Converter -->
+    <button id="btn-converter-comissao" onclick="converterComissao()" style="width:100%; padding:14px; background:linear-gradient(135deg,#C6A242,#E8C860); color:#121212; border:none; font-weight:bold; border-radius:10px; font-size:15px; cursor:pointer; box-shadow:0 4px 15px rgba(198,162,66,0.3);">💰 Converter em Saldo</button>
+    <p style="color:#555; font-size:10px; text-align:center; margin-top:8px;">A comissão será adicionada ao seu saldo de jogo</p>
+  </div>
+</div>
+
 </body>
 </html>

@@ -99,6 +99,7 @@ const UserSchema = new mongoose.Schema({
     affiliateLink: { type: String, default: null, unique: true, sparse: true },
     indicadoPor: { type: String, default: null },
     comissao: { type: Number, default: 0 },
+    comissaoSacada: { type: Number, default: 0 },
     primeiroDepositoPago: { type: Boolean, default: false },
     premioToken: { type: String, default: null },
     premioValor: { type: Number, default: null }
@@ -133,6 +134,8 @@ const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: 
 const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: "Muitas tentativas. Aguarde 15 minutos." }, standardHeaders: true, legacyHeaders: false });
 const saqueLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const affiliateLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const affiliateWithdrawLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
 
 // --- SANITIZAR ---
 function sanitizar(str) {
@@ -426,6 +429,63 @@ app.get("/api/saldo", autenticar, async (req, res) => {
     const user = await User.findOne({ username: req.usuario.username });
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, saldo: user.saldo, affiliateLink: user.affiliateLink });
+});
+
+app.get("/api/affiliate-stats", affiliateLimiter, autenticar, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.usuario.username });
+        if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
+        
+        // Contar quantos usuários foram indicados por este user
+        const totalAmigos = await User.countDocuments({ indicadoPor: user.username });
+        
+        res.json({
+            success: true,
+            totalAmigos: totalAmigos,
+            comissao: user.comissao || 0,
+            totalSacado: user.comissaoSacada || 0,
+            affiliateLink: user.affiliateLink
+        });
+    } catch (err) {
+        console.error("Erro ao buscar stats de afiliado:", err);
+        res.status(500).json({ success: false, message: "Erro interno" });
+    }
+});
+
+app.post("/api/affiliate-withdraw", affiliateWithdrawLimiter, autenticar, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.usuario.username });
+        if (!user) return res.status(404).json({ success: false, message: "Usuário não encontrado" });
+        
+        const comissao = user.comissao || 0;
+        if (comissao <= 0) {
+            return res.status(400).json({ success: false, message: "Sem comissão disponível para converter" });
+        }
+        
+        // Transferir comissão para saldo e zerar comissão, incrementar comissaoSacada
+        const atualizado = await User.findOneAndUpdate(
+            { username: req.usuario.username, comissao: { $gte: comissao } },
+            { 
+                $inc: { saldo: comissao, comissaoSacada: comissao },
+                $set: { comissao: 0 }
+            },
+            { new: true }
+        );
+        
+        if (!atualizado) {
+            return res.status(400).json({ success: false, message: "Erro ao converter comissão" });
+        }
+        
+        res.json({
+            success: true,
+            valorConvertido: comissao,
+            novoSaldo: atualizado.saldo,
+            totalSacado: atualizado.comissaoSacada || 0
+        });
+    } catch (err) {
+        console.error("Erro ao sacar comissão:", err);
+        res.status(500).json({ success: false, message: "Erro interno" });
+    }
 });
 
 app.post("/api/solicitar-saque", saqueLimiter, autenticar, async (req, res) => {
