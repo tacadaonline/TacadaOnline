@@ -536,9 +536,12 @@ src="https://www.facebook.com/tr?id=598041258883393&ev=PageView&noscript=1"
 
 <script>
 function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = String(str);
-    return div.innerHTML;
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 let usuarioLogado = localStorage.getItem("usuario");
 let valorAposta = 10;
@@ -1767,7 +1770,7 @@ async function gerarPix() {
 
         } else {
             // Se cair aqui, pode ser o erro 403 (IP Bloqueado)
-            document.getElementById("qR").innerHTML = `<p style='color:#ff4444'>❌ ${data.message || "Erro ao gerar PIX"}</p>`;
+            document.getElementById("qR").innerHTML = `<p style='color:#ff4444'>❌ ${escapeHtml(data.message || "Erro ao gerar PIX")}</p>`;
         }
     } catch(e) {
         console.error("Erro ao gerar PIX:", e);
