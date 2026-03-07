@@ -549,6 +549,7 @@
                     localStorage.setItem("usuario", user.toLowerCase());
                     localStorage.setItem("saldo", data.saldo || 0);
                     localStorage.setItem("token", data.token);
+                    if (data.affiliateLink) localStorage.setItem("affiliateLink", data.affiliateLink);
                     
                     // Redireciona usando caminho relativo para evitar erro no Render
                     window.location.href = "jogo.html"; 

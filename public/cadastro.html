@@ -645,6 +645,7 @@
                         if (loginData.success) {
                             localStorage.setItem("usuario", loginData.username);
                             localStorage.setItem("token", loginData.token);
+                            if (loginData.affiliateLink) localStorage.setItem("affiliateLink", loginData.affiliateLink);
                             window.location.href = "jogo.html";
                             return;
                         }
