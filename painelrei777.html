@@ -55,6 +55,9 @@
         <div class="stat-card"><small>Banca total</small><div id="statBanca">R$ 0,00</div></div>
         <div class="stat-card"><small>Jogadores</small><div id="statUsers">0</div></div>
         <div class="stat-card"><small>Dificuldade</small><div id="statRtp">0%</div></div>
+        <div class="stat-card"><small>Total Depositado</small><div id="statDepositos">R$ 0,00</div></div>
+        <div class="stat-card"><small>Total Sacado</small><div id="statSaques">R$ 0,00</div></div>
+        <div class="stat-card"><small>GGR (Lucro Casa)</small><div id="statGgr">R$ 0,00</div></div>
     </div>
 
     <div class="tab-menu">
@@ -177,6 +180,21 @@
                 });
                 const dataR = await resR.json();
                 document.getElementById("statRtp").innerText = (dataR.rtp * 100).toFixed(0) + "%";
+
+                // Carregar dados financeiros
+                const resF = await fetch("/admin/financeiro", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ senha })
+                });
+                const dataF = await resF.json();
+                if (dataF.success) {
+                    document.getElementById("statDepositos").innerText = `R$ ${dataF.totalDepositos.toFixed(2)}`;
+                    document.getElementById("statSaques").innerText = `R$ ${dataF.totalSaques.toFixed(2)}`;
+                    const ggrEl = document.getElementById("statGgr");
+                    ggrEl.innerText = `R$ ${dataF.ggr.toFixed(2)}`;
+                    ggrEl.style.color = dataF.ggr >= 0 ? '#4caf50' : '#f44336';
+                }
                 
                 listarSaques(); // Carrega saques também
             } else { alert("Senha Incorreta!"); }
