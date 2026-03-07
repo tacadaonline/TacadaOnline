@@ -1481,10 +1481,12 @@ canvas.addEventListener("touchmove", (e) => {
         const endX = branca.x + (invertedX * normalized * lineLength);
         const endY = branca.y + (invertedY * normalized * lineLength);
         const border = CANVAS_BORDER_WIDTH;
-        aimLine.setAttribute("x1", branca.x + border);
-        aimLine.setAttribute("y1", branca.y + border);
-        aimLine.setAttribute("x2", endX + border);
-        aimLine.setAttribute("y2", endY + border);
+        const scaleX = (canvas.offsetWidth - 2 * border) / canvas.width;
+        const scaleY = (canvas.offsetHeight - 2 * border) / canvas.height;
+        aimLine.setAttribute("x1", branca.x * scaleX + border);
+        aimLine.setAttribute("y1", branca.y * scaleY + border);
+        aimLine.setAttribute("x2", endX * scaleX + border);
+        aimLine.setAttribute("y2", endY * scaleY + border);
     }
 });
 
@@ -1568,10 +1570,12 @@ document.addEventListener("mousemove", (e) => {
         const endX = branca.x + (invertedX * normalized * lineLength);
         const endY = branca.y + (invertedY * normalized * lineLength);
         const border = CANVAS_BORDER_WIDTH;
-        aimLine.setAttribute("x1", branca.x + border);
-        aimLine.setAttribute("y1", branca.y + border);
-        aimLine.setAttribute("x2", endX + border);
-        aimLine.setAttribute("y2", endY + border);
+        const scaleX = (canvas.offsetWidth - 2 * border) / canvas.width;
+        const scaleY = (canvas.offsetHeight - 2 * border) / canvas.height;
+        aimLine.setAttribute("x1", branca.x * scaleX + border);
+        aimLine.setAttribute("y1", branca.y * scaleY + border);
+        aimLine.setAttribute("x2", endX * scaleX + border);
+        aimLine.setAttribute("y2", endY * scaleY + border);
     }
 });
 
