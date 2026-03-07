@@ -55,6 +55,7 @@
         <div class="stat-card"><small>Banca total</small><div id="statBanca">R$ 0,00</div></div>
         <div class="stat-card"><small>Jogadores</small><div id="statUsers">0</div></div>
         <div class="stat-card"><small>Dificuldade</small><div id="statRtp">0%</div></div>
+        <div class="stat-card"><small>Rollover Multiplier</small><div id="statRollover">1.0x</div></div>
         <div class="stat-card"><small>Total Depositado</small><div id="statDepositos">R$ 0,00</div></div>
         <div class="stat-card"><small>Total Sacado</small><div id="statSaques">R$ 0,00</div></div>
         <div class="stat-card"><small>GGR (Lucro Casa)</small><div id="statGgr">R$ 0,00</div></div>
@@ -77,6 +78,14 @@
                 <button onclick="salvarRTP()" style="background: var(--gold); font-weight: bold; padding: 0 20px; border-radius: 5px; cursor: pointer;">SALVAR</button>
             </div>
         </div>
+        <div class="section">
+            <h3>Multiplicador de Rollover</h3>
+            <p style="color: #888; font-size: 13px;">1.0 = Apostar 100% do depósito | 2.0 = Apostar 200% do depósito | 0 = Sem rollover</p>
+            <div style="display: flex; gap: 10px; max-width: 400px;">
+                <input type="number" id="vRollover" step="0.1" min="0" max="100" placeholder="Ex: 1.0">
+                <button onclick="salvarRollover()" style="background: var(--gold); font-weight: bold; padding: 0 20px; border-radius: 5px; cursor: pointer;">SALVAR</button>
+            </div>
+        </div>
     </div>
 
     <!-- JOGADORES -->
@@ -91,6 +100,7 @@
                     <tr>
                         <th>Usuário</th>
                         <th>Saldo</th>
+                        <th>Rollover</th>
                         <th>Ref por</th>
                         <th>Ações</th>
                     </tr>
@@ -184,6 +194,18 @@
                 const dataR = await resR.json();
                 document.getElementById("statRtp").innerText = (dataR.rtp * 100).toFixed(0) + "%";
 
+                // Carregar Rollover
+                const resRo = await fetch("/admin/get-rollover", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ senha })
+                });
+                const dataRo = await resRo.json();
+                if (dataRo.success) {
+                    document.getElementById("statRollover").innerText = parseFloat(dataRo.multiplier).toFixed(1) + "x";
+                    document.getElementById("vRollover").value = dataRo.multiplier;
+                }
+
                 // Carregar dados financeiros
                 const resF = await fetch("/admin/financeiro", {
                     method: "POST",
@@ -209,10 +231,12 @@
             <tr>
                 <td><strong>${escapeHtml(u.username)}</strong></td>
                 <td style="color: #fff;">R$ ${escapeHtml(u.saldo.toFixed(2))}</td>
+                <td style="color: ${(u.rollover_required || 0) > 0 ? '#f44336' : '#4caf50'};">${(u.rollover_required || 0) > 0 ? '🔒 R$ ' + escapeHtml(((u.rollover_required || 0).toFixed(2))) : '✅ Livre'}</td>
                 <td style="color: #888;">${escapeHtml(u.indicadoPor || '-')}</td>
                 <td>
                     <button class="btn-action btn-add" data-user="${escapeHtml(u.username)}" onclick="promptAddSaldo(this.dataset.user)">+ SALDO</button>
                     <button class="btn-action btn-zero" data-user="${escapeHtml(u.username)}" onclick="promptAddSaldo(this.dataset.user, true)">ZERAR</button>
+                    <button class="btn-action" style="background: #9c27b0; color: white;" data-user="${escapeHtml(u.username)}" onclick="promptSetRollover(this.dataset.user)">ROLLOVER</button>
                 </td>
             </tr>
         `).join('');
@@ -288,6 +312,35 @@
         });
         const data = await res.json();
         if(data.success) { alert("🔥 RTP Ajustado!"); carregarDados(); }
+    }
+
+    async function salvarRollover() {
+        const multiplier = document.getElementById("vRollover").value;
+        const senha = document.getElementById("sAdmin").value;
+        const res = await fetch("/admin/set-rollover", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ multiplier, senha })
+        });
+        const data = await res.json();
+        if(data.success) { alert("✅ Rollover ajustado!"); carregarDados(); }
+        else { alert("❌ " + (data.message || "Erro ao salvar rollover")); }
+    }
+
+    async function promptSetRollover(user) {
+        const senha = document.getElementById("sAdmin").value;
+        const input = prompt(`Definir rollover restante para ${user} (0 = liberado):`);
+        if (input === null) return;
+        const rollover_required = parseFloat(input);
+        if (isNaN(rollover_required) || rollover_required < 0) return alert("Valor inválido");
+        const res = await fetch("/admin/set-user-rollover", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username: user, rollover_required, senha })
+        });
+        const data = await res.json();
+        if(data.success) { alert("✅ Rollover do usuário atualizado!"); carregarDados(); }
+        else { alert("❌ " + (data.message || "Erro ao atualizar rollover")); }
     }
 </script>
 </body>
