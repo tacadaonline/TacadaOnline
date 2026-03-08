@@ -100,6 +100,7 @@ if (!ADMIN_PASSWORD_FIXA) {
 const ADMIN_PANEL_PATH = process.env.ADMIN_PANEL_PATH || ('/admin-panel-' + crypto.randomBytes(8).toString('hex'));
 let globalRTP = 0.30;
 let globalRolloverMultiplier = 1.0;
+let globalAffiliateCommission = 0.10;
 
 mongoose.connect(MONGO_URI)
     .then(async () => {
@@ -113,6 +114,11 @@ mongoose.connect(MONGO_URI)
         if (rolloverConfig) {
             globalRolloverMultiplier = rolloverConfig.value;
             console.log(`✅ Rollover multiplier carregado do banco: ${globalRolloverMultiplier}`);
+        }
+        const affiliateCommissionConfig = await Config.findOne({ key: 'affiliate_commission' });
+        if (affiliateCommissionConfig) {
+            globalAffiliateCommission = affiliateCommissionConfig.value;
+            console.log(`✅ Comissão de afiliado carregada do banco: ${globalAffiliateCommission}`);
         }
         console.log(`🔐 Admin panel path: ${ADMIN_PANEL_PATH}`);
     })
@@ -353,7 +359,7 @@ app.post("/api/callback-pix", callbackLimiter, async (req, res) => {
                     { new: false }
                 );
                 if (marcouPrimeiro) {
-                    const comissaoValor = Math.round(deposito.valor * 0.10 * 100) / 100;
+                    const comissaoValor = Math.round(deposito.valor * globalAffiliateCommission * 100) / 100;
                     try {
                         const referrer = await User.findOneAndUpdate(
                             { username: atualizado.indicadoPor },
@@ -634,6 +640,22 @@ app.post("/admin/set-rollover", adminLimiter, async (req, res) => {
 app.post("/admin/get-rollover", adminLimiter, (req, res) => {
     if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
     res.json({ success: true, multiplier: globalRolloverMultiplier });
+});
+
+app.post("/admin/set-affiliate-commission", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    const commission = parseFloat(req.body.commission);
+    if (isNaN(commission) || !isFinite(commission) || commission < 0 || commission > 1) {
+        return res.status(400).json({ success: false, message: "Comissão deve ser entre 0 e 1" });
+    }
+    globalAffiliateCommission = commission;
+    await Config.findOneAndUpdate({ key: 'affiliate_commission' }, { value: commission }, { upsert: true });
+    res.json({ success: true });
+});
+
+app.post("/admin/get-affiliate-commission", adminLimiter, (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+    res.json({ success: true, commission: globalAffiliateCommission });
 });
 
 app.post("/admin/set-user-rollover", adminLimiter, async (req, res) => {
