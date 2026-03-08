@@ -605,6 +605,37 @@
     </div>
 
     <script>
+        // Capturar ref da URL e persistir via cookie + localStorage (30 dias)
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const refFromUrl = urlParams.get('ref');
+            if (refFromUrl) {
+                localStorage.setItem('affiliateRef', refFromUrl);
+                localStorage.setItem('affiliateRefTime', Date.now().toString());
+                const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+                document.cookie = `affiliateRef=${encodeURIComponent(refFromUrl)}; expires=${expires}; path=/; SameSite=Lax`;
+            }
+        })();
+
+        function getStoredRef() {
+            // 1. Tentar da URL primeiro
+            const urlRef = new URLSearchParams(window.location.search).get('ref');
+            if (urlRef) return urlRef;
+
+            // 2. Tentar do localStorage (verificar se não expirou - 30 dias)
+            const storedRef = localStorage.getItem('affiliateRef');
+            const storedTime = parseInt(localStorage.getItem('affiliateRefTime') || '0');
+            if (storedRef && (Date.now() - storedTime) < 30 * 24 * 60 * 60 * 1000) {
+                return storedRef;
+            }
+
+            // 3. Tentar do cookie
+            const cookieMatch = document.cookie.match(/affiliateRef=([^;]+)/);
+            if (cookieMatch) return decodeURIComponent(cookieMatch[1]);
+
+            return null;
+        }
+
         async function cadastrar() {
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value.trim();
@@ -622,7 +653,7 @@
 
             try {
                 // Rota atualizada para bater com o server.js
-                const ref = new URLSearchParams(window.location.search).get('ref') || '';
+                const ref = getStoredRef() || '';
                 const response = await fetch("/api/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
