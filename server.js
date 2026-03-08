@@ -694,6 +694,58 @@ app.post("/admin/financeiro", adminLimiter, async (req, res) => {
     res.json({ success: true, totalDepositos, totalSaques, ggr });
 });
 
+app.post("/admin/affiliate-stats", adminLimiter, async (req, res) => {
+    if (!verificarSenhaAdmin(req.body.senha)) return res.status(403).json({ success: false });
+
+    try {
+        const affiliates = await User.find({ affiliateLink: { $ne: null } },
+            'username affiliateLink comissao comissaoSacada');
+
+        const result = [];
+
+        for (const affiliate of affiliates) {
+            const referrals = await User.find({ indicadoPor: affiliate.username },
+                'username primeiroDepositoPago');
+
+            const registrations_count = referrals.length;
+            const depositors_count = referrals.filter(r => r.primeiroDepositoPago).length;
+
+            const depositorUsernames = referrals
+                .filter(r => r.primeiroDepositoPago)
+                .map(r => r.username);
+
+            let total_deposited_by_referrals = 0;
+            if (depositorUsernames.length > 0) {
+                const depositResult = await Deposito.aggregate([
+                    { $match: { username: { $in: depositorUsernames }, status: "pago" } },
+                    { $group: { _id: null, total: { $sum: "$valor" } } }
+                ]);
+                total_deposited_by_referrals = depositResult[0]?.total || 0;
+            }
+
+            const commission_earned = (affiliate.comissao || 0) + (affiliate.comissaoSacada || 0);
+
+            result.push({
+                username: affiliate.username,
+                affiliateLink: affiliate.affiliateLink,
+                registrations_count,
+                depositors_count,
+                total_deposited_by_referrals: Math.round(total_deposited_by_referrals * 100) / 100,
+                commission_earned: Math.round(commission_earned * 100) / 100,
+                commission_available: Math.round((affiliate.comissao || 0) * 100) / 100,
+                commission_withdrawn: Math.round((affiliate.comissaoSacada || 0) * 100) / 100
+            });
+        }
+
+        result.sort((a, b) => b.commission_earned - a.commission_earned);
+
+        res.json({ success: true, affiliates: result });
+    } catch (err) {
+        console.error("Erro ao buscar stats de afiliados:", err);
+        res.status(500).json({ success: false, message: "Erro interno" });
+    }
+});
+
 app.listen(process.env.PORT || 10000, '0.0.0.0', () => {
     console.log(`🚀 Servidor rodando na porta ${process.env.PORT || 10000}`);
 });

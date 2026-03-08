@@ -66,6 +66,7 @@
         <button class="tab-btn" onclick="openTab('jogadores')">👥 Jogadores</button>
         <button class="tab-btn" onclick="openTab('saques')">💸 Saques</button>
         <button class="tab-btn" onclick="openTab('api')">🔑 API Pagamento</button>
+        <button class="tab-btn" onclick="openTab('afiliados')">🤝 Afiliados</button>
     </div>
 
     <!-- CONFIGURAÇÕES -->
@@ -151,10 +152,42 @@
         </div>
     </div>
 
+    <!-- AFILIADOS -->
+    <div id="afiliados" class="tab-content">
+        <div class="section">
+            <h3>📊 Painel de Afiliados</h3>
+            <div id="affiliateStatsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:20px;">
+                <div class="stat-card"><small>Total Afiliados</small><div id="statTotalAffiliates">0</div></div>
+                <div class="stat-card"><small>Total Registros via Ref</small><div id="statTotalRegistrations">0</div></div>
+                <div class="stat-card"><small>Total Depositantes</small><div id="statTotalDepositors">0</div></div>
+                <div class="stat-card"><small>Total Comissões Geradas</small><div id="statTotalCommissions">R$ 0,00</div></div>
+            </div>
+            <input type="text" id="searchAffiliate" class="search-box" placeholder="🔎 Buscar afiliado..." oninput="filtrarAfiliados()" style="margin-bottom:15px; max-width:300px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Afiliado</th>
+                        <th>Link</th>
+                        <th>Registros</th>
+                        <th>Depositantes</th>
+                        <th>Total Depositado</th>
+                        <th>Comissão Gerada</th>
+                        <th>Comissão Disponível</th>
+                        <th>Comissão Sacada</th>
+                    </tr>
+                </thead>
+                <tbody id="listaAfiliados">
+                    <tr><td colspan="8" style="text-align:center; color:#666;">Conecte para carregar...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 <script>
     let cacheUsers = [];
+    let cacheAffiliates = [];
 
     function escapeHtml(str) {
         return String(str)
@@ -241,6 +274,7 @@
                 }
                 
                 listarSaques(); // Carrega saques também
+                carregarAfiliados(); // Carrega estatísticas de afiliados
             } else { alert("Senha Incorreta!"); }
         } catch (e) { alert("Erro de conexão!"); }
     }
@@ -373,6 +407,58 @@
         const data = await res.json();
         if(data.success) { alert("✅ Rollover do usuário atualizado!"); carregarDados(); }
         else { alert("❌ " + (data.message || "Erro ao atualizar rollover")); }
+    }
+
+    async function carregarAfiliados() {
+        const senha = document.getElementById("sAdmin").value;
+        try {
+            const res = await fetch("/admin/affiliate-stats", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ senha })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cacheAffiliates = data.affiliates;
+                renderizarAfiliados(cacheAffiliates);
+
+                const totalAffiliates = cacheAffiliates.length;
+                const totalRegistrations = cacheAffiliates.reduce((a, b) => a + b.registrations_count, 0);
+                const totalDepositors = cacheAffiliates.reduce((a, b) => a + b.depositors_count, 0);
+                const totalCommissions = cacheAffiliates.reduce((a, b) => a + b.commission_earned, 0);
+
+                document.getElementById("statTotalAffiliates").innerText = totalAffiliates;
+                document.getElementById("statTotalRegistrations").innerText = totalRegistrations;
+                document.getElementById("statTotalDepositors").innerText = totalDepositors;
+                document.getElementById("statTotalCommissions").innerText = `R$ ${totalCommissions.toFixed(2)}`;
+            }
+        } catch(e) {
+            console.error("Erro ao carregar afiliados:", e);
+        }
+    }
+
+    function renderizarAfiliados(lista) {
+        document.getElementById("listaAfiliados").innerHTML = lista.map(a => `
+            <tr>
+                <td><strong>${escapeHtml(a.username)}</strong></td>
+                <td style="color:#888; font-size:11px;">${escapeHtml(a.affiliateLink)}</td>
+                <td>${a.registrations_count}</td>
+                <td>${a.depositors_count}</td>
+                <td style="color:#fff;">R$ ${a.total_deposited_by_referrals.toFixed(2)}</td>
+                <td style="color:#4caf50;">R$ ${a.commission_earned.toFixed(2)}</td>
+                <td style="color:#ffd700;">R$ ${a.commission_available.toFixed(2)}</td>
+                <td style="color:#888;">R$ ${a.commission_withdrawn.toFixed(2)}</td>
+            </tr>
+        `).join('');
+    }
+
+    function filtrarAfiliados() {
+        const filtro = document.getElementById("searchAffiliate").value.toLowerCase();
+        const filtrado = cacheAffiliates.filter(a =>
+            a.username.toLowerCase().includes(filtro) ||
+            a.affiliateLink.toLowerCase().includes(filtro)
+        );
+        renderizarAfiliados(filtrado);
     }
 </script>
 </body>
