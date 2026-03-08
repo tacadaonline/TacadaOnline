@@ -86,6 +86,14 @@
                 <button onclick="salvarRollover()" style="background: var(--gold); font-weight: bold; padding: 0 20px; border-radius: 5px; cursor: pointer;">SALVAR</button>
             </div>
         </div>
+        <div class="section">
+            <h3>Comissão de Afiliado (%)</h3>
+            <p style="color: #888; font-size: 13px;">0.05 = 5% | 0.10 = 10% | 0.20 = 20%</p>
+            <div style="display: flex; gap: 10px; max-width: 400px;">
+                <input type="number" id="vAffiliate" step="0.01" min="0" max="1" placeholder="Ex: 0.10">
+                <button onclick="salvarAffiliateCommission()" style="background: var(--gold); font-weight: bold; padding: 0 20px; border-radius: 5px; cursor: pointer;">SALVAR</button>
+            </div>
+        </div>
     </div>
 
     <!-- JOGADORES -->
@@ -204,6 +212,17 @@
                 if (dataRo.success) {
                     document.getElementById("statRollover").innerText = parseFloat(dataRo.multiplier).toFixed(1) + "x";
                     document.getElementById("vRollover").value = dataRo.multiplier;
+                }
+
+                // Carregar Comissão de Afiliado
+                const resAff = await fetch("/admin/get-affiliate-commission", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ senha })
+                });
+                const dataAff = await resAff.json();
+                if (dataAff.success) {
+                    document.getElementById("vAffiliate").value = dataAff.commission;
                 }
 
                 // Carregar dados financeiros
@@ -325,6 +344,19 @@
         const data = await res.json();
         if(data.success) { alert("✅ Rollover ajustado!"); carregarDados(); }
         else { alert("❌ " + (data.message || "Erro ao salvar rollover")); }
+    }
+
+    async function salvarAffiliateCommission() {
+        const commission = document.getElementById("vAffiliate").value;
+        const senha = document.getElementById("sAdmin").value;
+        const res = await fetch("/admin/set-affiliate-commission", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ commission, senha })
+        });
+        const data = await res.json();
+        if(data.success) { alert("✅ Comissão de afiliado ajustada!"); carregarDados(); }
+        else { alert("❌ " + (data.message || "Erro ao salvar comissão de afiliado")); }
     }
 
     async function promptSetRollover(user) {
